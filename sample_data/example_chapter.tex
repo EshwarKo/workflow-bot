@@ -1,0 +1,179 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\norm}[1]{\|#1\|}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\newcommand{\Banach}{\mathcal{B}}
+
+\begin{document}
+
+\section{Normed Spaces and Banach Spaces}
+
+We begin with the fundamental structures of functional analysis. Throughout this chapter, $\mathbb{K}$ denotes either $\R$ or $\C$.
+
+\begin{definition}[Normed Space]
+\label{def:normed-space}
+A \emph{normed space} is a pair $(X, \norm{\cdot})$ where $X$ is a vector space over $\mathbb{K}$ and $\norm{\cdot} : X \to [0, \infty)$ is a function satisfying:
+\begin{enumerate}
+    \item $\norm{x} = 0$ if and only if $x = 0$ (positive definiteness);
+    \item $\norm{\alpha x} = |\alpha| \norm{x}$ for all $\alpha \in \mathbb{K}$, $x \in X$ (absolute homogeneity);
+    \item $\norm{x + y} \leq \norm{x} + \norm{y}$ for all $x, y \in X$ (triangle inequality).
+\end{enumerate}
+\end{definition}
+
+\begin{remark}
+Every normed space $(X, \norm{\cdot})$ is a metric space with the metric $d(x,y) = \norm{x - y}$. Thus all metric space concepts (convergence, continuity, open and closed sets, compactness) apply to normed spaces.
+\end{remark}
+
+\begin{definition}[Banach Space]
+\label{def:banach-space}
+A normed space $(X, \norm{\cdot})$ is called a \emph{Banach space} if it is complete with respect to the metric $d(x,y) = \norm{x-y}$, i.e., every Cauchy sequence in $X$ converges to a limit in $X$.
+\end{definition}
+
+\begin{example}
+\label{eg:lp-spaces}
+For $1 \leq p \leq \infty$, the space $\ell^p$ consists of all sequences $(x_n)_{n \geq 1}$ in $\mathbb{K}$ with
+\[
+    \norm{x}_p = \begin{cases}
+        \left( \sum_{n=1}^{\infty} |x_n|^p \right)^{1/p} & \text{if } 1 \leq p < \infty, \\
+        \sup_{n \geq 1} |x_n| & \text{if } p = \infty.
+    \end{cases}
+\]
+Each $\ell^p$ is a Banach space. The space $c_0 \subset \ell^\infty$ of sequences converging to zero is a closed subspace, hence also a Banach space.
+\end{example}
+
+\begin{example}
+\label{eg:CK-space}
+Let $K$ be a compact Hausdorff space. The space $C(K)$ of continuous functions $f : K \to \mathbb{K}$ with the supremum norm
+\[
+    \norm{f}_\infty = \sup_{x \in K} |f(x)|
+\]
+is a Banach space.
+\end{example}
+
+\begin{definition}[Subspace]
+\label{def:subspace}
+A \emph{(closed) subspace} of a normed space $X$ is a subset $Y \subseteq X$ that is both a vector subspace and closed in the norm topology. We write $Y \leq X$.
+\end{definition}
+
+\begin{proposition}
+\label{prop:closed-subspace-banach}
+A closed subspace of a Banach space is a Banach space.
+\end{proposition}
+
+\begin{proof}
+Let $X$ be a Banach space and $Y \leq X$ a closed subspace. Let $(y_n)$ be a Cauchy sequence in $Y$. Since $Y \subseteq X$ and $X$ is complete, $(y_n)$ converges to some $y \in X$. Since $Y$ is closed, $y \in Y$. Hence $Y$ is complete.
+\end{proof}
+
+\begin{definition}[Quotient Space]
+\label{def:quotient-space}
+Let $X$ be a normed space and $Y \leq X$ a closed subspace. The \emph{quotient space} $X/Y$ is the vector space of cosets $\{x + Y : x \in X\}$ equipped with the quotient norm
+\[
+    \norm{x + Y}_{X/Y} = \inf_{y \in Y} \norm{x + y}.
+\]
+\end{definition}
+
+\begin{proposition}
+\label{prop:quotient-banach}
+If $X$ is a Banach space and $Y \leq X$, then $X/Y$ is a Banach space.
+\end{proposition}
+
+\begin{proof}
+We must show completeness. Let $(\bar{x}_n)$ be an absolutely summable sequence in $X/Y$, i.e., $\sum \norm{\bar{x}_n} < \infty$. For each $n$, choose a representative $x_n \in \bar{x}_n$ with $\norm{x_n} \leq \norm{\bar{x}_n} + 2^{-n}$. Then $\sum \norm{x_n} < \infty$, so since $X$ is complete, $s = \sum x_n$ converges in $X$. Then $\sum_{n=1}^N \bar{x}_n = \overline{s_N} \to \bar{s}$ in $X/Y$. By the absolute summability criterion for completeness, $X/Y$ is a Banach space.
+\end{proof}
+
+\begin{theorem}[Riesz's Lemma]
+\label{thm:riesz-lemma}
+Let $X$ be a normed space, $Y \leq X$ a proper closed subspace, and $0 < \theta < 1$. Then there exists $x_\theta \in X$ with $\norm{x_\theta} = 1$ and $d(x_\theta, Y) \geq \theta$.
+\end{theorem}
+
+\begin{proof}
+Since $Y \neq X$, choose $z \in X \setminus Y$. Let $d = \inf_{y \in Y} \norm{z - y} > 0$ (positive because $Y$ is closed and $z \notin Y$). Choose $y_0 \in Y$ with $\norm{z - y_0} \leq d / \theta$. Set
+\[
+    x_\theta = \frac{z - y_0}{\norm{z - y_0}}.
+\]
+Then $\norm{x_\theta} = 1$. For any $y \in Y$,
+\[
+    \norm{x_\theta - y} = \frac{\norm{z - y_0 - \norm{z-y_0} y}}{\norm{z - y_0}} = \frac{\norm{z - (y_0 + \norm{z-y_0}y)}}{\norm{z-y_0}} \geq \frac{d}{\norm{z - y_0}} \geq \theta.
+\]
+Hence $d(x_\theta, Y) \geq \theta$.
+\end{proof}
+
+\begin{corollary}
+\label{cor:finite-dim-closed}
+Every finite-dimensional subspace of a normed space is closed.
+\end{corollary}
+
+\begin{proof}
+By induction on dimension. The case $\dim = 0$ is trivial. For the inductive step, if $Y$ is finite-dimensional and $(y_n) \to x$ with $y_n \in Y$, then $(y_n)$ is bounded, and by compactness of the closed unit ball in finite dimensions (equivalence of norms), a subsequence converges in $Y$. Hence $x \in Y$.
+\end{proof}
+
+\begin{theorem}[Riesz's Theorem — Characterisation of Finite Dimension]
+\label{thm:riesz-finite-dim}
+A normed space $X$ has finite dimension if and only if the closed unit ball $B_X = \{x \in X : \norm{x} \leq 1\}$ is compact.
+\end{theorem}
+
+\begin{proof}
+$(\Rightarrow)$ If $\dim X = n < \infty$, then $X$ is isomorphic to $\mathbb{K}^n$. The unit ball is closed and bounded in $\mathbb{K}^n$, hence compact by Heine-Borel.
+
+$(\Leftarrow)$ We prove the contrapositive. Suppose $\dim X = \infty$. We construct a sequence in $B_X$ with no convergent subsequence. Choose $x_1 \in X$ with $\norm{x_1} = 1$. Let $Y_1 = \text{span}\{x_1\}$. By Riesz's Lemma (Theorem~\ref{thm:riesz-lemma}) with $\theta = 1/2$, there exists $x_2$ with $\norm{x_2} = 1$ and $\norm{x_2 - x_1} \geq 1/2$. Continuing inductively, let $Y_n = \text{span}\{x_1, \ldots, x_n\}$ and choose $x_{n+1}$ with $\norm{x_{n+1}} = 1$ and $d(x_{n+1}, Y_n) \geq 1/2$. Then $\norm{x_i - x_j} \geq 1/2$ for all $i \neq j$, so $(x_n)$ has no convergent subsequence. Thus $B_X$ is not compact.
+\end{proof}
+
+\begin{definition}[Equivalent Norms]
+\label{def:equiv-norms}
+Two norms $\norm{\cdot}_1$ and $\norm{\cdot}_2$ on a vector space $X$ are \emph{equivalent} if there exist constants $c, C > 0$ such that
+\[
+    c \norm{x}_1 \leq \norm{x}_2 \leq C \norm{x}_1 \quad \text{for all } x \in X.
+\]
+\end{definition}
+
+\begin{theorem}[Equivalence of Norms in Finite Dimensions]
+\label{thm:equiv-norms-finite-dim}
+On a finite-dimensional vector space, all norms are equivalent.
+\end{theorem}
+
+\begin{proof}
+It suffices to show every norm $\norm{\cdot}$ on $\mathbb{K}^n$ is equivalent to $\norm{\cdot}_1$. Let $e_1, \ldots, e_n$ be the standard basis.
+
+\textbf{Upper bound.} For $x = \sum \alpha_i e_i$,
+\[
+    \norm{x} \leq \sum |\alpha_i| \norm{e_i} \leq M \norm{x}_1,
+\]
+where $M = \max_i \norm{e_i}$. So the norm $\norm{\cdot}$ is continuous with respect to $\norm{\cdot}_1$.
+
+\textbf{Lower bound.} The unit sphere $S = \{x : \norm{x}_1 = 1\}$ is compact in $(\mathbb{K}^n, \norm{\cdot}_1)$. The function $x \mapsto \norm{x}$ is continuous on $S$ and strictly positive (since $x \neq 0$ on $S$). By compactness, it attains its minimum $m > 0$. So $\norm{x} \geq m$ on $S$, hence $\norm{x} \geq m \norm{x}_1$ for all $x$ by homogeneity.
+\end{proof}
+
+\begin{lemma}[Absolute Summability Criterion]
+\label{lem:abs-summability}
+A normed space $X$ is a Banach space if and only if every absolutely summable series converges, i.e., $\sum_{n=1}^\infty \norm{x_n} < \infty$ implies $\sum_{n=1}^\infty x_n$ converges in $X$.
+\end{lemma}
+
+\begin{proof}
+$(\Rightarrow)$ If $X$ is complete and $\sum \norm{x_n} < \infty$, the partial sums $s_N = \sum_{n=1}^N x_n$ form a Cauchy sequence since for $M > N$,
+\[
+    \norm{s_M - s_N} = \norm{\sum_{n=N+1}^M x_n} \leq \sum_{n=N+1}^M \norm{x_n} \to 0.
+\]
+By completeness, $(s_N)$ converges.
+
+$(\Leftarrow)$ Let $(y_n)$ be Cauchy. Choose a subsequence $(y_{n_k})$ with $\norm{y_{n_{k+1}} - y_{n_k}} \leq 2^{-k}$. Set $x_k = y_{n_{k+1}} - y_{n_k}$. Then $\sum \norm{x_k} \leq 1 < \infty$, so $\sum x_k$ converges. The partial sums of $\sum x_k$ are $y_{n_{k+1}} - y_{n_1}$, so $y_{n_k} \to y$ for some $y$. Since $(y_n)$ is Cauchy with a convergent subsequence, $y_n \to y$.
+\end{proof}
+
+\begin{remark}
+The absolute summability criterion is the standard tool for proving completeness. To show a space is Banach, take an absolutely summable series and produce its sum. This is typically easier than working directly with Cauchy sequences.
+\end{remark}
+
+\end{document}
