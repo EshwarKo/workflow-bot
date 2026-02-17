@@ -1,6 +1,9 @@
 # Agent-generated output directories
 generations/
 
+# MathPipe KB output
+kb/
+
 # Log files
 logs/
 
