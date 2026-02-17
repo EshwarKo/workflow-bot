@@ -188,3 +188,34 @@ def summarise_kb(kb_dir: Path) -> dict[str, Any]:
         summary["low_confidence_count"] = 0
 
     return summary
+
+
+# --- Solution and export directory helpers ---
+
+
+def ensure_solutions_dir(output_dir: Path, course_id: str, sheet_id: int) -> Path:
+    """Create and return the solutions directory for a problem sheet."""
+    sol_dir = output_dir / course_id / f"sheet_{sheet_id}"
+    sol_dir.mkdir(parents=True, exist_ok=True)
+    return sol_dir
+
+
+def ensure_exports_dir(output_dir: Path, course_id: str) -> Path:
+    """Create and return the exports directory for a course."""
+    exp_dir = output_dir / course_id / "exports"
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    return exp_dir
+
+
+def write_json(path: Path, data: dict | list) -> None:
+    """Write a JSON file (single object, not JSONL)."""
+    import json as _json
+    with open(path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def read_json(path: Path) -> dict:
+    """Read a JSON file."""
+    import json as _json
+    with open(path, encoding="utf-8") as f:
+        return _json.load(f)

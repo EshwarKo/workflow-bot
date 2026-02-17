@@ -1,0 +1,46 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\norm}[1]{\|#1\|}
+
+\begin{document}
+
+\begin{center}
+\textbf{Functional Analysis -- Problem Sheet 1} \\
+Hilary Term 2026
+\end{center}
+
+\bigskip
+
+\begin{enumerate}
+
+\item Let $(X, \norm{\cdot})$ be a normed space and $Y \subseteq X$ a subspace (not necessarily closed). Show that $\overline{Y}$ is also a subspace.
+
+\item Let $X$ be a Banach space and let $(x_n)_{n \geq 1}$ be a sequence in $X$ such that $\sum_{n=1}^{\infty} \norm{x_n} < \infty$. Show that $\sum_{n=1}^{\infty} x_n$ converges in $X$.
+
+\item Let $1 \leq p < q \leq \infty$. Show that $\ell^p \subsetneq \ell^q$ (strict inclusion).
+\begin{enumerate}
+    \item[(a)] Show that $\ell^p \subseteq \ell^q$.
+    \item[(b)] Find an explicit element of $\ell^q \setminus \ell^p$.
+\end{enumerate}
+
+\item Let $X$ be an infinite-dimensional normed space. Use Riesz's Lemma to show that the closed unit ball $B_X = \{x \in X : \norm{x} \leq 1\}$ is not compact.
+
+\item Let $X$ be a normed space and $Y \leq X$ a closed subspace. Define the quotient norm on $X/Y$ by $\norm{x + Y} = \inf_{y \in Y} \norm{x + y}$.
+\begin{enumerate}
+    \item[(a)] Verify that $\norm{\cdot}_{X/Y}$ is indeed a norm.
+    \item[(b)] Show that if $X$ is a Banach space, then $X/Y$ is a Banach space.
+\end{enumerate}
+
+\item Show that all norms on $\R^n$ are equivalent. \\
+\emph{Hint: It suffices to show every norm is equivalent to $\norm{\cdot}_1$.}
+
+\item Let $(X, \norm{\cdot})$ be a Banach space and $Y \subseteq X$ a subspace. Show that $Y$ is a Banach space (with the inherited norm) if and only if $Y$ is closed in $X$.
+
+\item Let $K$ be a compact metric space. Show that $C(K)$ with the supremum norm is a Banach space. \\
+\emph{Hint: Use the fact that a uniform limit of continuous functions is continuous.}
+
+\end{enumerate}
+
+\end{document}

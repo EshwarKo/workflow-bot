@@ -3,15 +3,18 @@
 MathPipe: Autonomous Mathematics Learning Pipeline
 ===================================================
 
-MVP — Knowledge Base Builder from LaTeX Source
+Converts LaTeX lecture notes and problem sheets into structured,
+confidence-graded study materials with genuine mathematical intuition.
 
-Extracts structured mathematical knowledge (definitions, theorems, lemmas,
-proof skeletons) from LaTeX lecture notes into JSONL knowledge base files.
+Commands:
+    kb      Build knowledge base from LaTeX source
+    sheet   Process a problem sheet (route → solve → verify → output)
+    export  Generate study materials (study notes, Anki cards, trick bank)
 
 Usage:
-    python mathpipe.py --config config/example_functional_analysis.yaml --source sample_data/example_chapter.tex
-    python mathpipe.py --config config/my_course.yaml --source notes.tex --chapters 1,2
-    python mathpipe.py --config config/my_course.yaml --source notes.tex --model opus
+    python mathpipe.py kb    --config config/course.yaml --source notes.tex
+    python mathpipe.py sheet --config config/course.yaml --sheet sheet1.tex
+    python mathpipe.py export --config config/course.yaml --format study
 """
 
 import argparse
@@ -25,36 +28,24 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ClaudeSDKClient,
-    TextBlock,
-    ToolUseBlock,
-    UserMessage,
-    ToolResultBlock,
-)
-
+from agent_session import MODELS, load_prompt, run_agent
 from config_loader import load_course_config, CourseConfig
 from latex_parser import split_into_chapters, extract_preamble
-from kb_writer import ensure_kb_dir, validate_jsonl_output
+from kb_writer import (
+    ensure_kb_dir,
+    ensure_solutions_dir,
+    ensure_exports_dir,
+    validate_jsonl_output,
+    read_jsonl,
+    write_json,
+)
+from sheet_parser import parse_sheet, format_problem_for_display
+from router import load_full_kb, route_sheet, format_context_bundle
 
 load_dotenv()
 
 
-# Available models
-MODELS: dict[str, str] = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "opus": "claude-opus-4-5-20251101",
-}
-
-PROMPTS_DIR = Path(__file__).parent / "prompts"
-
-
-def load_kb_builder_prompt() -> str:
-    """Load the KB builder system prompt."""
-    return (PROMPTS_DIR / "kb_builder_prompt.md").read_text()
+# ── KB BUILD PIPELINE ──────────────────────────────────────────────
 
 
 async def run_kb_extraction(
@@ -65,44 +56,22 @@ async def run_kb_extraction(
     model: str,
     preamble: str = "",
 ) -> dict[str, Any]:
-    """
-    Run KB extraction for a single chapter using Claude Agent SDK.
-
-    Creates a dedicated agent session that reads the chapter source and
-    writes structured JSONL output.
-
-    Args:
-        chapter_text: The LaTeX source text for this chapter.
-        chapter_config: Config dict for this chapter (id, title, etc.).
-        course_config: Full course configuration.
-        output_dir: Base output directory for KB files.
-        model: Full model ID string.
-        preamble: LaTeX preamble (custom commands, notation).
-
-    Returns:
-        Stats dict with extraction results.
-    """
+    """Run KB extraction for a single chapter."""
     course_id = course_config["course_id"]
     chapter_id = chapter_config["id"]
     chapter_title = chapter_config["title"]
 
-    # Create workspace
     kb_dir = ensure_kb_dir(output_dir, course_id, chapter_id)
 
     # Write chapter source for the agent to read
     source_file = kb_dir / "chapter_source.tex"
     source_file.write_text(chapter_text, encoding="utf-8")
 
-    # Write preamble if available (for notation reference)
     if preamble:
-        preamble_file = kb_dir / "preamble.tex"
-        preamble_file.write_text(preamble, encoding="utf-8")
+        (kb_dir / "preamble.tex").write_text(preamble, encoding="utf-8")
 
-    # Output file path (agent will write here)
     output_file = kb_dir / "kb.jsonl"
-
-    # Build system prompt
-    system_prompt = load_kb_builder_prompt()
+    system_prompt = load_prompt("kb_builder_prompt")
 
     # Build notation context
     notation_overrides = course_config.get("notation_overrides", {})
@@ -112,31 +81,29 @@ async def run_kb_extraction(
         for symbol, meaning in notation_overrides.items():
             notation_section += f"  - `{symbol}` means: {meaning}\n"
 
-    preamble_section = ""
+    preamble_note = ""
     if preamble:
-        preamble_section = (
-            "\n\nThe file `preamble.tex` contains the document preamble with "
-            "custom LaTeX command definitions. Read it first to understand any "
-            "custom notation used in the chapter.\n"
+        preamble_note = (
+            "\n\nThe file `preamble.tex` contains custom LaTeX command "
+            "definitions. Read it first for notation context.\n"
         )
 
-    # Build the task message
     task_message = f"""Extract all mathematical objects from the chapter source file.
 
 **Course:** {course_config["course_name"]} ({course_id})
 **Chapter {chapter_id}:** {chapter_title}
 **Source file:** chapter_source.tex
 **Output file:** kb.jsonl
-{notation_section}{preamble_section}
+{notation_section}{preamble_note}
 Instructions:
-1. {"Read `preamble.tex` first for custom commands, then read" if preamble else "Read"} `chapter_source.tex`.
+1. {"Read `preamble.tex` first, then read" if preamble else "Read"} `chapter_source.tex`.
 2. Identify ALL definitions, theorems, lemmas, propositions, corollaries, examples, and remarks.
-3. For each, extract the structured fields as specified in your system prompt.
+3. For each, extract ALL structured fields including intuition, mechanism, triggers, and pitfalls.
 4. Use the ID format: `{course_id}.ch{chapter_id}.<type_abbrev>.<number>`
 5. Write the complete JSONL to `kb.jsonl` — one JSON object per line, NO wrapping array, NO markdown fences.
-6. After writing, report a summary: count of each type extracted, any items with confidence < 0.80, and any difficulties.
+6. Report a summary: count of each type, any items with confidence < 0.80, and any difficulties.
 
-Be thorough. Extract EVERY formal mathematical statement in the chapter."""
+Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOOD intuition — this is the most valuable output."""
 
     print(f"\n{'='*60}")
     print(f"  Chapter {chapter_id}: {chapter_title}")
@@ -144,63 +111,19 @@ Be thorough. Extract EVERY formal mathematical statement in the chapter."""
     print(f"  Output: {output_file}")
     print(f"{'='*60}\n")
 
-    # Create the agent
-    client = ClaudeSDKClient(
-        options=ClaudeAgentOptions(
-            model=model,
-            system_prompt=system_prompt,
-            allowed_tools=["Read", "Write", "Glob", "Grep"],
-            max_turns=50,
-            cwd=str(kb_dir.resolve()),
-        )
+    result = await run_agent(
+        system_prompt=system_prompt,
+        task_message=task_message,
+        cwd=kb_dir,
+        model=model,
+        max_turns=60,
     )
-
-    # Run the agent session
-    result_text = ""
-    ch_start = time.time()
-
-    try:
-        async with client:
-            await client.query(task_message)
-
-            async for msg in client.receive_response():
-                if isinstance(msg, AssistantMessage):
-                    for block in msg.content:
-                        if isinstance(block, TextBlock):
-                            result_text += block.text
-                            print(block.text, end="", flush=True)
-                        elif isinstance(block, ToolUseBlock):
-                            print(f"\n  [Tool: {block.name}]", flush=True)
-
-                elif isinstance(msg, UserMessage):
-                    for block in msg.content:
-                        if isinstance(block, ToolResultBlock):
-                            is_error = bool(block.is_error) if block.is_error else False
-                            if is_error:
-                                error_str = str(block.content)[:300]
-                                print(f"  [Error] {error_str}", flush=True)
-                            else:
-                                print("  [Done]", flush=True)
-
-    except Exception as e:
-        print(f"\n  Agent error: {type(e).__name__}: {e}")
-        traceback.print_exc()
-        return {
-            "chapter_id": chapter_id,
-            "title": chapter_title,
-            "status": "error",
-            "error": str(e),
-            "total_records": 0,
-            "duration_seconds": round(time.time() - ch_start, 1),
-        }
-
-    print()  # newline after streaming
 
     # Validate output
     stats: dict[str, Any] = {
         "chapter_id": chapter_id,
         "title": chapter_title,
-        "duration_seconds": round(time.time() - ch_start, 1),
+        "duration_seconds": result["duration_seconds"],
     }
 
     if output_file.exists():
@@ -219,9 +142,6 @@ Be thorough. Extract EVERY formal mathematical statement in the chapter."""
         if confidences:
             stats["avg_confidence"] = round(sum(confidences) / len(confidences), 3)
             stats["low_confidence_count"] = sum(1 for c in confidences if c < 0.80)
-        else:
-            stats["avg_confidence"] = None
-            stats["low_confidence_count"] = 0
 
         stats["status"] = "success"
     else:
@@ -231,227 +151,517 @@ Be thorough. Extract EVERY formal mathematical statement in the chapter."""
     return stats
 
 
-async def run_kb_pipeline(
-    config: CourseConfig,
-    chapters: dict[int, str],
-    output_dir: Path,
-    model_name: str,
-    preamble: str = "",
-) -> None:
-    """
-    Run the full KB extraction pipeline across all specified chapters.
-
-    Args:
-        config: Course configuration.
-        chapters: Dict mapping chapter_id -> chapter LaTeX text.
-        output_dir: Base output directory.
-        model_name: Short model name (haiku/sonnet/opus).
-        preamble: LaTeX preamble text.
-    """
-    model = MODELS[model_name]
+async def cmd_kb(args: argparse.Namespace) -> int:
+    """Build knowledge base from LaTeX source."""
+    config = load_course_config(args.config)
     course_id = config["course_id"]
+    model = MODELS[args.model]
 
-    print(f"\n{'='*60}")
-    print(f"  MathPipe KB Builder")
-    print(f"{'='*60}")
-    print(f"  Course: {config['course_name']} ({course_id})")
-    print(f"  Chapters: {sorted(chapters.keys())}")
-    print(f"  Model: {model_name} ({model})")
-    print(f"  Output: {output_dir / course_id}")
-    print(f"{'='*60}")
+    preamble = extract_preamble(args.source)
+    if preamble:
+        print(f"Extracted LaTeX preamble ({len(preamble)} chars)")
+
+    chapters = split_into_chapters(args.source, config)
+    if not chapters:
+        print("Error: No chapters found. Check config titles match LaTeX headings.")
+        return 1
+
+    if args.chapters:
+        chapter_ids = [int(x.strip()) for x in args.chapters.split(",")]
+        chapters = {k: v for k, v in chapters.items() if k in chapter_ids}
+        if not chapters:
+            print(f"Error: No matching chapters for IDs {chapter_ids}")
+            return 1
+
+    print(f"\nMathPipe KB Builder — {config['course_name']}")
+    print(f"Model: {args.model} | Chapters: {sorted(chapters.keys())}")
+    print(f"Output: {args.output_dir / course_id}\n")
 
     all_stats: list[dict[str, Any]] = []
     pipeline_start = time.time()
+    chapter_configs = {ch["id"]: ch for ch in config["chapters"]}
 
     for chapter_id in sorted(chapters.keys()):
-        chapter_text = chapters[chapter_id]
-        chapter_configs = {ch["id"]: ch for ch in config["chapters"]}
-        chapter_config = chapter_configs[chapter_id]
-
         stats = await run_kb_extraction(
-            chapter_text=chapter_text,
-            chapter_config=chapter_config,
+            chapter_text=chapters[chapter_id],
+            chapter_config=chapter_configs[chapter_id],
             course_config=config,
-            output_dir=output_dir,
+            output_dir=args.output_dir,
             model=model,
             preamble=preamble,
         )
         all_stats.append(stats)
 
     total_time = round(time.time() - pipeline_start, 1)
+    total_records = sum(s.get("total_records", 0) for s in all_stats)
+
+    print(f"\n{'='*60}")
+    print(f"  KB BUILD COMPLETE — {total_records} records in {total_time}s")
+    for s in all_stats:
+        marker = "OK" if s.get("status") == "success" else s.get("status", "?").upper()
+        print(f"  Ch {s['chapter_id']}: {s.get('total_records', 0)} records [{marker}]")
+    print(f"{'='*60}\n")
+
+    # Write log
+    log_dir = args.output_dir / course_id / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    write_json(log_dir / f"kb_build_{int(time.time())}.json", {
+        "course_id": course_id,
+        "model": args.model,
+        "total_time_seconds": total_time,
+        "total_records": total_records,
+        "chapters": all_stats,
+    })
+
+    return 0
+
+
+# ── SHEET PROCESSING PIPELINE ──────────────────────────────────────
+
+
+async def solve_problem(
+    problem: dict[str, Any],
+    context_entries: list[dict[str, Any]],
+    course_config: CourseConfig,
+    work_dir: Path,
+    model: str,
+    problem_num: int,
+) -> dict[str, Any]:
+    """Run the solver agent on a single problem."""
+    system_prompt = load_prompt("solver_prompt")
+    course_id = course_config["course_id"]
+
+    # Write problem and context for the agent
+    problem_file = work_dir / f"problem_{problem_num}.json"
+    context_file = work_dir / f"context_{problem_num}.txt"
+    output_file = work_dir / f"solution_{problem_num}.json"
+
+    write_json(problem_file, problem)
+    context_file.write_text(format_context_bundle(context_entries), encoding="utf-8")
+
+    task_message = f"""Solve the mathematical problem in `problem_{problem_num}.json`.
+
+**Course:** {course_config["course_name"]} ({course_id})
+**Context:** Relevant KB entries are in `context_{problem_num}.txt`.
+**Output:** Write your solution to `solution_{problem_num}.json`.
+
+Read both files, then produce a complete solution following the schema in your system prompt.
+The output must be valid JSON (single object, not JSONL). No markdown fences in the file."""
+
+    print(f"\n  Problem {problem_num}: solving...")
+    result = await run_agent(
+        system_prompt=system_prompt,
+        task_message=task_message,
+        cwd=work_dir,
+        model=model,
+        max_turns=40,
+    )
+
+    stats = {
+        "problem_id": problem_num,
+        "duration_seconds": result["duration_seconds"],
+        "status": result["status"],
+    }
+
+    if output_file.exists():
+        try:
+            from kb_writer import read_json
+            solution = read_json(output_file)
+            stats["strategies"] = len(solution.get("strategies", []))
+            stats["confidence"] = solution.get("classification", {}).get("confidence", None)
+            stats["status"] = "success"
+        except Exception:
+            stats["status"] = "invalid_output"
+    else:
+        stats["status"] = "no_output"
+
+    return stats
+
+
+async def verify_problem(
+    problem_num: int,
+    work_dir: Path,
+    course_config: CourseConfig,
+    model: str,
+) -> dict[str, Any]:
+    """Run the verifier agent on a solved problem."""
+    system_prompt = load_prompt("verifier_prompt")
+    output_file = work_dir / f"verification_{problem_num}.json"
+
+    solution_file = work_dir / f"solution_{problem_num}.json"
+    context_file = work_dir / f"context_{problem_num}.txt"
+
+    if not solution_file.exists():
+        return {"problem_id": problem_num, "status": "no_solution"}
+
+    task_message = f"""Verify the solution in `solution_{problem_num}.json`.
+
+**Context:** KB entries are in `context_{problem_num}.txt`.
+**Output:** Write your verification report to `verification_{problem_num}.json`.
+
+Read both files, then perform all verification layers as specified in your system prompt.
+The output must be valid JSON. No markdown fences."""
+
+    print(f"  Problem {problem_num}: verifying...")
+    result = await run_agent(
+        system_prompt=system_prompt,
+        task_message=task_message,
+        cwd=work_dir,
+        model=model,
+        max_turns=30,
+    )
+
+    stats = {
+        "problem_id": problem_num,
+        "duration_seconds": result["duration_seconds"],
+        "status": result["status"],
+    }
+
+    if output_file.exists():
+        try:
+            from kb_writer import read_json
+            verification = read_json(output_file)
+            overall = verification.get("overall", {})
+            stats["confidence"] = overall.get("confidence")
+            stats["verification_status"] = overall.get("status", "unknown")
+            stats["human_review_required"] = overall.get("human_review_required", True)
+            stats["status"] = "success"
+        except Exception:
+            stats["status"] = "invalid_output"
+
+    return stats
+
+
+async def cmd_sheet(args: argparse.Namespace) -> int:
+    """Process a problem sheet: parse → route → solve → verify → output."""
+    config = load_course_config(args.config)
+    course_id = config["course_id"]
+    model = MODELS[args.model]
+
+    # Parse problem sheet
+    print(f"\nParsing problem sheet: {args.sheet}")
+    problems = parse_sheet(args.sheet)
+    if not problems:
+        print("Error: No problems found in sheet.")
+        return 1
+    print(f"Found {len(problems)} problems")
+    for p in problems:
+        print(f"  {format_problem_for_display(p)}")
+
+    # Determine sheet ID from filename or flag
+    sheet_id = args.sheet_id or _infer_sheet_id(args.sheet)
+    print(f"Sheet ID: {sheet_id}")
+
+    # Load KB
+    all_chapter_ids = [ch["id"] for ch in config["chapters"]]
+    kb = load_full_kb(args.kb_dir, course_id, all_chapter_ids)
+    total_kb = sum(len(v) for v in kb.values())
+    print(f"Loaded KB: {total_kb} entries across {len(kb)} chapters")
+
+    if total_kb == 0:
+        print("Error: KB is empty. Run `mathpipe.py kb` first to build it.")
+        return 1
+
+    # Determine relevant chapters for this sheet
+    sheet_chapters = None
+    if config.get("sheets"):
+        for s in config["sheets"]:
+            if s["id"] == sheet_id:
+                sheet_chapters = s.get("chapters")
+                break
+    if sheet_chapters:
+        print(f"Sheet covers chapters: {sheet_chapters}")
+
+    # Route problems to KB entries
+    print("\nRouting problems to KB entries...")
+    context_bundles = route_sheet(problems, kb, sheet_chapters=sheet_chapters)
+    for pid, entries in context_bundles.items():
+        print(f"  Problem {pid}: {len(entries)} relevant KB entries")
+
+    # Create work directory
+    work_dir = ensure_solutions_dir(args.output_dir, course_id, sheet_id)
+    print(f"Work directory: {work_dir}")
+
+    # Solve each problem
+    print(f"\n{'='*60}")
+    print(f"  SOLVING — Sheet {sheet_id} ({len(problems)} problems)")
+    print(f"  Model: {args.model}")
+    print(f"{'='*60}")
+
+    solve_stats: list[dict[str, Any]] = []
+    for problem in problems:
+        pid = problem["id"]
+        stats = await solve_problem(
+            problem=problem,
+            context_entries=context_bundles.get(pid, []),
+            course_config=config,
+            work_dir=work_dir,
+            model=model,
+            problem_num=pid,
+        )
+        solve_stats.append(stats)
+
+    # Verify each solved problem
+    if not args.skip_verify:
+        print(f"\n{'='*60}")
+        print(f"  VERIFYING")
+        print(f"{'='*60}")
+
+        verify_stats: list[dict[str, Any]] = []
+        for problem in problems:
+            pid = problem["id"]
+            stats = await verify_problem(
+                problem_num=pid,
+                work_dir=work_dir,
+                course_config=config,
+                model=model,
+            )
+            verify_stats.append(stats)
+    else:
+        verify_stats = []
+        print("\n  Verification skipped (--skip-verify)")
+
+    # Generate output based on mode
+    print(f"\n{'='*60}")
+    print(f"  GENERATING OUTPUT — mode: {args.mode}")
+    print(f"{'='*60}")
+
+    await _generate_sheet_output(
+        problems=problems,
+        work_dir=work_dir,
+        course_config=config,
+        model=model,
+        mode=args.mode,
+        sheet_id=sheet_id,
+    )
 
     # Print summary
     print(f"\n{'='*60}")
-    print(f"  PIPELINE COMPLETE")
+    print(f"  SHEET PROCESSING COMPLETE")
     print(f"{'='*60}")
-    print(f"  Total time: {total_time}s")
-    print(f"  Chapters processed: {len(all_stats)}")
-
-    total_records = 0
-    for s in all_stats:
-        total_records += s.get("total_records", 0)
-        marker = "OK" if s["status"] == "success" else s["status"].upper()
-        print(f"\n  Chapter {s['chapter_id']}: {s['title']}")
-        print(f"    Status: {marker}")
-        print(f"    Records: {s.get('total_records', 0)}")
-        if s.get("by_type"):
-            for t, count in sorted(s["by_type"].items()):
-                print(f"      {t}: {count}")
-        if s.get("avg_confidence") is not None:
-            print(f"    Avg confidence: {s['avg_confidence']}")
-        if s.get("low_confidence_count", 0) > 0:
-            print(f"    Low confidence (<0.80): {s['low_confidence_count']}")
-        print(f"    Duration: {s.get('duration_seconds', '?')}s")
-
-    print(f"\n  Total KB records: {total_records}")
-
-    # Write pipeline log
-    log_dir = output_dir / course_id / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"pipeline_run_{int(time.time())}.json"
-    with open(log_file, "w") as f:
-        json.dump(
-            {
-                "course_id": course_id,
-                "course_name": config["course_name"],
-                "model": model_name,
-                "total_time_seconds": total_time,
-                "total_records": total_records,
-                "chapters": all_stats,
-            },
-            f,
-            indent=2,
-        )
-    print(f"\n  Pipeline log: {log_file}")
+    for ss in solve_stats:
+        v = next((v for v in verify_stats if v["problem_id"] == ss["problem_id"]), {})
+        vstat = v.get("verification_status", "skipped")
+        print(f"  Problem {ss['problem_id']}: solve={ss['status']}, verify={vstat}")
+    print(f"  Output: {work_dir}")
     print(f"{'='*60}\n")
 
+    return 0
 
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
+
+async def _generate_sheet_output(
+    problems: list[dict[str, Any]],
+    work_dir: Path,
+    course_config: CourseConfig,
+    model: str,
+    mode: str,
+    sheet_id: int,
+) -> None:
+    """Generate the final output document for a processed sheet."""
+    system_prompt = load_prompt("output_prompt")
+
+    # Collect all solution and verification files
+    solution_files = sorted(work_dir.glob("solution_*.json"))
+    verification_files = sorted(work_dir.glob("verification_*.json"))
+
+    output_ext = {"hints": "md", "study": "md", "anki": "csv", "tricks": "jsonl"}
+    output_file = work_dir / f"output_{mode}.{output_ext.get(mode, 'md')}"
+
+    task_message = f"""Generate {mode} mode output for problem sheet {sheet_id}.
+
+**Course:** {course_config["course_name"]} ({course_config["course_id"]})
+**Mode:** {mode}
+**Solution files:** {', '.join(f.name for f in solution_files)}
+**Verification files:** {', '.join(f.name for f in verification_files)}
+**Output file:** {output_file.name}
+
+Read all solution files (and verification files if present), then generate the output in {mode} mode as specified in your system prompt.
+Write the result to `{output_file.name}`. No wrapping markdown fences — write the raw format."""
+
+    await run_agent(
+        system_prompt=system_prompt,
+        task_message=task_message,
+        cwd=work_dir,
+        model=model,
+        max_turns=40,
+    )
+
+    if output_file.exists():
+        size = output_file.stat().st_size
+        print(f"  Output written: {output_file} ({size:,} bytes)")
+    else:
+        print(f"  Warning: Output file not created: {output_file}")
+
+
+def _infer_sheet_id(sheet_path: Path) -> int:
+    """Try to infer sheet ID from filename like 'sheet1.tex' or 'Sheet_2.tex'."""
+    import re
+    match = re.search(r"(\d+)", sheet_path.stem)
+    return int(match.group(1)) if match else 1
+
+
+# ── EXPORT PIPELINE ────────────────────────────────────────────────
+
+
+async def cmd_export(args: argparse.Namespace) -> int:
+    """Generate study materials from the KB."""
+    config = load_course_config(args.config)
+    course_id = config["course_id"]
+    model = MODELS[args.model]
+
+    # Load KB
+    all_chapter_ids = [ch["id"] for ch in config["chapters"]]
+    if args.chapters:
+        all_chapter_ids = [int(x.strip()) for x in args.chapters.split(",")]
+
+    kb = load_full_kb(args.kb_dir, course_id, all_chapter_ids)
+    total_kb = sum(len(v) for v in kb.values())
+    print(f"\nLoaded KB: {total_kb} entries across {len(kb)} chapters")
+
+    if total_kb == 0:
+        print("Error: KB is empty. Run `mathpipe.py kb` first.")
+        return 1
+
+    export_dir = ensure_exports_dir(args.output_dir, course_id)
+    system_prompt = load_prompt("output_prompt")
+
+    output_ext = {"study": "md", "anki": "csv", "tricks": "jsonl"}
+    output_file = export_dir / f"{args.format}.{output_ext.get(args.format, 'md')}"
+
+    # Write all KB entries to a single file for the agent to read
+    all_entries_file = export_dir / "kb_all.jsonl"
+    with open(all_entries_file, "w", encoding="utf-8") as f:
+        for ch_id in sorted(kb.keys()):
+            for record in kb[ch_id]:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    chapters_info = ", ".join(
+        f"Ch {ch['id']}: {ch['title']}"
+        for ch in config["chapters"]
+        if ch["id"] in all_chapter_ids
+    )
+
+    task_message = f"""Generate {args.format} mode output from the knowledge base.
+
+**Course:** {config["course_name"]} ({course_id})
+**Mode:** {args.format}
+**KB file:** kb_all.jsonl ({total_kb} entries)
+**Chapters:** {chapters_info}
+**Output file:** {output_file.name}
+
+Read `kb_all.jsonl` (one JSON object per line), then generate the {args.format} output as specified in your system prompt.
+Write the result to `{output_file.name}`. No wrapping markdown fences."""
+
+    print(f"\nGenerating {args.format} export...")
+    print(f"Model: {args.model} | Output: {output_file}")
+
+    await run_agent(
+        system_prompt=system_prompt,
+        task_message=task_message,
+        cwd=export_dir,
+        model=model,
+        max_turns=50,
+    )
+
+    if output_file.exists():
+        size = output_file.stat().st_size
+        print(f"\nExport written: {output_file} ({size:,} bytes)")
+    else:
+        print(f"\nWarning: Export not created: {output_file}")
+
+    return 0
+
+
+# ── CLI ─────────────────────────────────────────────────────────────
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the argument parser with subcommands."""
     parser = argparse.ArgumentParser(
-        description="MathPipe — Mathematics Knowledge Base Builder (MVP)",
+        prog="mathpipe",
+        description="MathPipe — Autonomous Mathematics Learning Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Commands:
+  kb      Build knowledge base from LaTeX source
+  sheet   Process a problem sheet (route, solve, verify, output)
+  export  Generate study materials from the KB (study notes, Anki, tricks)
+
 Examples:
-  # Process all chapters from a LaTeX source
-  python mathpipe.py --config config/example_functional_analysis.yaml \\
-                     --source sample_data/example_chapter.tex
-
-  # Process specific chapters only
-  python mathpipe.py --config config/my_course.yaml --source notes.tex --chapters 1,2
-
-  # Use Opus for higher quality extraction
-  python mathpipe.py --config config/my_course.yaml --source notes.tex --model opus
-
-  # Custom output directory
-  python mathpipe.py --config config/my_course.yaml --source notes.tex --output-dir ./my_kb
+  python mathpipe.py kb --config config/course.yaml --source notes.tex
+  python mathpipe.py sheet --config config/course.yaml --sheet sheet1.tex
+  python mathpipe.py export --config config/course.yaml --format anki
         """,
     )
-    parser.add_argument(
-        "--config",
-        type=Path,
-        required=True,
-        help="Path to course_config.yaml",
-    )
-    parser.add_argument(
-        "--source",
-        type=Path,
-        required=True,
-        help="Path to LaTeX source file (.tex)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("./kb"),
-        help="Output directory for KB files (default: ./kb)",
-    )
-    parser.add_argument(
-        "--chapters",
-        type=str,
-        default=None,
-        help="Comma-separated chapter IDs to process (default: all)",
-    )
-    parser.add_argument(
-        "--model",
-        choices=list(MODELS.keys()),
-        default="sonnet",
-        help="Model for extraction (default: sonnet)",
-    )
-    return parser.parse_args()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # ── kb ──
+    kb_p = subparsers.add_parser("kb", help="Build knowledge base from LaTeX source")
+    kb_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
+    kb_p.add_argument("--source", type=Path, required=True, help="LaTeX source file")
+    kb_p.add_argument("--output-dir", type=Path, default=Path("./kb"), help="KB output dir")
+    kb_p.add_argument("--chapters", type=str, default=None, help="Comma-separated chapter IDs")
+    kb_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
+
+    # ── sheet ──
+    sheet_p = subparsers.add_parser("sheet", help="Process a problem sheet")
+    sheet_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
+    sheet_p.add_argument("--sheet", type=Path, required=True, help="Problem sheet .tex file")
+    sheet_p.add_argument("--kb-dir", type=Path, default=Path("./kb"), help="KB directory")
+    sheet_p.add_argument("--output-dir", type=Path, default=Path("./solutions"), help="Solutions output dir")
+    sheet_p.add_argument("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted)")
+    sheet_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
+    sheet_p.add_argument("--mode", choices=["hints", "study", "full"], default="hints",
+                         help="Output mode: hints (progressive disclosure), study (full notes), full (everything)")
+    sheet_p.add_argument("--skip-verify", action="store_true", help="Skip verification step")
+
+    # ── export ──
+    export_p = subparsers.add_parser("export", help="Generate study materials from KB")
+    export_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
+    export_p.add_argument("--kb-dir", type=Path, default=Path("./kb"), help="KB directory")
+    export_p.add_argument("--output-dir", type=Path, default=Path("./kb"), help="Export output dir")
+    export_p.add_argument("--chapters", type=str, default=None, help="Comma-separated chapter IDs")
+    export_p.add_argument("--format", choices=["study", "anki", "tricks"], required=True,
+                          help="Export format")
+    export_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
+
+    return parser
 
 
 def main() -> int:
     """Main entry point."""
-    args = parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
 
-    # Validate inputs
+    # Validate common inputs
     if not args.config.exists():
-        print(f"Error: Config file not found: {args.config}")
-        return 1
-    if not args.source.exists():
-        print(f"Error: Source file not found: {args.source}")
+        print(f"Error: Config not found: {args.config}")
         return 1
 
-    # Load config
+    if args.command == "kb" and not args.source.exists():
+        print(f"Error: Source not found: {args.source}")
+        return 1
+
+    if args.command == "sheet" and not args.sheet.exists():
+        print(f"Error: Sheet not found: {args.sheet}")
+        return 1
+
+    # Dispatch to command handler
+    handlers = {
+        "kb": cmd_kb,
+        "sheet": cmd_sheet,
+        "export": cmd_export,
+    }
+
     try:
-        config = load_course_config(args.config)
-    except (ValueError, FileNotFoundError) as e:
-        print(f"Error loading config: {e}")
-        return 1
-
-    # Extract preamble for notation reference
-    preamble = extract_preamble(args.source)
-    if preamble:
-        print(f"Extracted LaTeX preamble ({len(preamble)} chars)")
-
-    # Split source into chapters
-    try:
-        chapters = split_into_chapters(args.source, config)
-    except Exception as e:
-        print(f"Error parsing source: {e}")
-        return 1
-
-    if not chapters:
-        print("Error: No chapters found in source file.")
-        print("Check that your config chapter titles match the LaTeX headings.")
-        print("The parser looks for \\chapter{...} or \\section{...} commands.")
-        return 1
-
-    # Filter chapters if specified
-    if args.chapters:
-        try:
-            chapter_ids = [int(x.strip()) for x in args.chapters.split(",")]
-        except ValueError:
-            print("Error: --chapters must be comma-separated integers (e.g., 1,2,3)")
-            return 1
-        chapters = {k: v for k, v in chapters.items() if k in chapter_ids}
-        if not chapters:
-            available = sorted(
-                ch["id"] for ch in config["chapters"]
-            )
-            print(f"Error: No matching chapters for IDs {chapter_ids}")
-            print(f"Available chapter IDs: {available}")
-            return 1
-
-    # Print chapter summary
-    print(f"\nFound {len(chapters)} chapter(s) to process:")
-    for ch_id, ch_text in sorted(chapters.items()):
-        print(f"  Chapter {ch_id}: {len(ch_text):,} characters")
-
-    # Run pipeline
-    try:
-        asyncio.run(
-            run_kb_pipeline(config, chapters, args.output_dir, args.model, preamble)
-        )
+        return asyncio.run(handlers[args.command](args))
     except KeyboardInterrupt:
-        print("\n\nInterrupted. Partial output may be in the output directory.")
+        print("\n\nInterrupted. Partial output may be available.")
         return 130
     except Exception as e:
         print(f"\nFatal error: {type(e).__name__}: {e}")
         traceback.print_exc()
         return 1
-
-    return 0
 
 
 if __name__ == "__main__":
