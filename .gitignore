@@ -15,3 +15,4 @@ venv_linux
 __pycache__
 api-key
 .playwright-mcp
+node_modules

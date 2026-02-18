@@ -14,63 +14,132 @@ Usage:
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
-import latex2mathml.converter
 from jinja2 import Template
 from weasyprint import HTML
 
 
-# ── LaTeX → MathML conversion ────────────────────────────────────────
+# ── Path to the MathJax Node.js renderer ─────────────────────────────
+
+_MATH_RENDERER = Path(__file__).parent / "math_to_svg.js"
 
 
-def _convert_latex_fragment(latex: str, display: bool = False) -> str:
-    """Convert a single LaTeX math fragment to MathML."""
-    try:
-        mathml = latex2mathml.converter.convert(latex)
-        if display:
-            mathml = mathml.replace('display="inline"', 'display="block"')
-        return mathml
-    except Exception:
-        # Fallback: render as styled code
-        escaped = latex.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        tag = "div" if display else "span"
-        return f'<{tag} class="math-fallback">{escaped}</{tag}>'
+# ── LaTeX → SVG conversion (batched via MathJax) ─────────────────────
+
+
+class MathRenderer:
+    """Collects LaTeX fragments, batch-renders them to SVG via MathJax,
+    and provides placeholder-based substitution."""
+
+    def __init__(self) -> None:
+        self._fragments: list[dict[str, Any]] = []
+        self._svg_cache: dict[str, str] = {}
+        self._rendered = False
+
+    def _placeholder(self, frag_id: str) -> str:
+        return f"__MATH_{frag_id}__"
+
+    def add(self, latex: str, display: bool = False) -> str:
+        """Register a LaTeX fragment and return a placeholder string."""
+        frag_id = str(len(self._fragments))
+        self._fragments.append({
+            "id": frag_id,
+            "latex": latex,
+            "display": display,
+        })
+        return self._placeholder(frag_id)
+
+    def render_all(self) -> None:
+        """Batch-render all collected fragments to SVG via Node.js + MathJax."""
+        if not self._fragments or self._rendered:
+            return
+
+        payload = json.dumps(self._fragments)
+        try:
+            result = subprocess.run(
+                ["node", str(_MATH_RENDERER)],
+                input=payload,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode != 0:
+                print(f"MathJax warning: {result.stderr.strip()}", file=sys.stderr)
+            self._svg_cache = json.loads(result.stdout) if result.stdout else {}
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError) as e:
+            print(f"MathJax renderer failed: {e}", file=sys.stderr)
+            self._svg_cache = {}
+
+        self._rendered = True
+
+    def substitute(self, html_text: str) -> str:
+        """Replace all placeholders with their rendered SVGs."""
+        for frag in self._fragments:
+            frag_id = frag["id"]
+            placeholder = self._placeholder(frag_id)
+            svg = self._svg_cache.get(frag_id, "")
+            if not svg:
+                # Fallback: render as styled code
+                escaped = (frag["latex"]
+                           .replace("&", "&amp;")
+                           .replace("<", "&lt;")
+                           .replace(">", "&gt;"))
+                tag = "div" if frag["display"] else "span"
+                svg = f'<{tag} class="math-fallback">{escaped}</{tag}>'
+            elif frag["display"]:
+                svg = f'<div class="math-display">{svg}</div>'
+            else:
+                svg = f'<span class="math-inline">{svg}</span>'
+            html_text = html_text.replace(placeholder, svg)
+        return html_text
+
+
+# Module-level renderer instance, reset per compile run
+_renderer: MathRenderer | None = None
+
+
+def _get_renderer() -> MathRenderer:
+    global _renderer
+    if _renderer is None:
+        _renderer = MathRenderer()
+    return _renderer
 
 
 def latex_to_html(text: str) -> str:
-    """Convert a string containing LaTeX math delimiters to HTML with MathML.
+    """Convert a string containing LaTeX math delimiters to HTML with SVG math.
 
     Handles:
       - \\[ ... \\]  and  $$ ... $$   (display math)
       - \\( ... \\)  and  $ ... $     (inline math)
       - \\begin{...} ... \\end{...}   (environments used as display math)
       - LaTeX formatting: \\textbf, \\emph, \\\\, \\quad, etc.
+      - Markdown-style bold, italic, headers, and lists
     """
     if not text:
         return ""
 
-    # Normalise line breaks inside the text
+    renderer = _get_renderer()
     result = text
 
     # Step 1: Display math  \[ ... \]
     def _replace_display_bracket(m: re.Match) -> str:
-        return _convert_latex_fragment(m.group(1).strip(), display=True)
+        return renderer.add(m.group(1).strip(), display=True)
 
     result = re.sub(r"\\\[(.*?)\\\]", _replace_display_bracket, result, flags=re.DOTALL)
 
     # Step 2: Display math  $$ ... $$
     def _replace_display_dollar(m: re.Match) -> str:
-        return _convert_latex_fragment(m.group(1).strip(), display=True)
+        return renderer.add(m.group(1).strip(), display=True)
 
     result = re.sub(r"\$\$(.*?)\$\$", _replace_display_dollar, result, flags=re.DOTALL)
 
     # Step 3: Standalone display-math environments not yet wrapped
-    # e.g. \begin{vmatrix}...\end{vmatrix}, \begin{align*}...\end{align*}
     def _replace_env_display(m: re.Match) -> str:
-        return _convert_latex_fragment(m.group(0).strip(), display=True)
+        return renderer.add(m.group(0).strip(), display=True)
 
     result = re.sub(
         r"\\begin\{(vmatrix|bmatrix|pmatrix|Vmatrix|Bmatrix|matrix|align\*?|"
@@ -82,33 +151,30 @@ def latex_to_html(text: str) -> str:
 
     # Step 4: Inline math  \( ... \)
     def _replace_inline_paren(m: re.Match) -> str:
-        return _convert_latex_fragment(m.group(1).strip(), display=False)
+        return renderer.add(m.group(1).strip(), display=False)
 
     result = re.sub(r"\\\((.*?)\\\)", _replace_inline_paren, result, flags=re.DOTALL)
 
     # Step 5: Inline math  $ ... $  (but not $$)
     def _replace_inline_dollar(m: re.Match) -> str:
-        return _convert_latex_fragment(m.group(1).strip(), display=False)
+        return renderer.add(m.group(1).strip(), display=False)
 
     result = re.sub(r"(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)", _replace_inline_dollar, result, flags=re.DOTALL)
 
-    # Step 6: LaTeX formatting commands
+    # Step 6: LaTeX formatting commands (outside math)
     result = re.sub(r"\\textbf\{(.*?)\}", r"<strong>\1</strong>", result)
     result = re.sub(r"\\emph\{(.*?)\}", r"<em>\1</em>", result)
     result = re.sub(r"\\textit\{(.*?)\}", r"<em>\1</em>", result)
     result = re.sub(r"\\text\{(.*?)\}", r"\1", result)
 
-    # Step 7: Markdown-style bold and italic (common in LLM-generated solutions)
-    # Bold: **text**  (but not inside MathML tags)
+    # Step 7: Markdown-style bold and italic
     result = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", result)
-    # Italic: *text*  (but not ** and not inside MathML)
     result = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", result)
 
-    # Step 8: Markdown-style headers within solution text
-    # ### Header → <h4>  (used inside solutions, we don't want full <h3>)
+    # Step 8: Markdown-style headers
     result = re.sub(r"(?:^|\n)#{3,}\s+(.+?)(?:\n|$)", r"<h4>\1</h4>", result)
 
-    # Line breaks
+    # Line breaks (only outside math — placeholders are safe)
     result = result.replace("\\\\", "<br>")
     result = result.replace("\\newline", "<br>")
 
@@ -117,7 +183,7 @@ def latex_to_html(text: str) -> str:
     result = result.replace("\\qquad", "&emsp;&emsp;")
     result = result.replace("\\,", "&thinsp;")
 
-    # Markdown-style bullet lists:  lines starting with "- "
+    # Markdown-style bullet lists
     def _replace_md_list(m: re.Match) -> str:
         items = re.findall(r"^- (.+)$", m.group(0), re.MULTILINE)
         li = "".join(f"<li>{item}</li>" for item in items)
@@ -125,8 +191,7 @@ def latex_to_html(text: str) -> str:
 
     result = re.sub(r"(?:^|\n)(- .+(?:\n- .+)*)", _replace_md_list, result)
 
-    # Convert newlines to <br> for multi-line content (but not double-newlines
-    # which become paragraph breaks)
+    # Paragraph breaks and newlines
     result = re.sub(r"\n{2,}", "</p><p>", result)
     result = result.replace("\n", " ")
 
@@ -448,12 +513,25 @@ HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
   ul, ol { margin: 0.3em 0 0.3em 1.5em; }
   li { margin: 0.15em 0; }
 
-  /* ── Math ───────────────────────────────── */
-  math { font-size: 1.05em; }
-  math[display="block"] {
+  /* ── Math (SVG via MathJax) ──────────────── */
+  .math-inline {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1;
+  }
+  .math-inline svg {
+    vertical-align: middle;
+    display: inline-block;
+  }
+  .math-display {
     display: block;
     text-align: center;
-    margin: 0.6em 0;
+    margin: 0.7em 0;
+    overflow-x: auto;
+  }
+  .math-display svg {
+    display: inline-block;
+    max-width: 100%;
   }
   .math-fallback {
     font-family: "Latin Modern Mono", "Courier New", monospace;
@@ -467,6 +545,10 @@ HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
     text-align: center;
     margin: 0.5em 0;
     padding: 0.5em;
+  }
+  .math-error {
+    color: var(--red);
+    font-size: 9pt;
   }
 
   /* ── Common errors list ─────────────────── */
@@ -837,7 +919,11 @@ def compile_pdf(
         else:
             subtitle = f"{len(entries)} Problems"
 
-    # Render HTML
+    # Reset the math renderer for this compile run
+    global _renderer
+    _renderer = MathRenderer()
+
+    # Render HTML template (first pass — collects math fragments as placeholders)
     html_str = HTML_TEMPLATE.render(
         title=title,
         subtitle=subtitle,
@@ -845,6 +931,13 @@ def compile_pdf(
         latex_to_html=latex_to_html,
         generated_date=date.today().strftime("%d %B %Y"),
     )
+
+    # Batch-render all LaTeX fragments to SVG via MathJax
+    renderer = _get_renderer()
+    renderer.render_all()
+
+    # Second pass — substitute placeholders with rendered SVGs
+    html_str = renderer.substitute(html_str)
 
     # Write PDF
     if output_path is None:
