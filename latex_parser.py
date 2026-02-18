@@ -141,6 +141,71 @@ def split_into_chapters(
     return chapters
 
 
+SUBSECTION_PATTERN = re.compile(
+    r"\\subsection\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
+    re.MULTILINE,
+)
+
+
+def split_into_sections(
+    chapter_text: str,
+    chapter_id: int,
+    char_threshold: int = 20_000,
+) -> list[dict[str, Any]]:
+    """
+    Split a chapter into subsection-level chunks for parallel extraction.
+
+    If the chapter is smaller than char_threshold, returns a single chunk
+    containing the whole chapter. Otherwise splits on \\subsection boundaries.
+
+    Args:
+        chapter_text: Full LaTeX text of the chapter.
+        chapter_id: The chapter number (used for labelling).
+        char_threshold: Chapters smaller than this are returned as one chunk.
+
+    Returns:
+        List of dicts, each with:
+        - "section_idx": 0-based index of this section within the chapter.
+        - "title": Subsection title (or "Full Chapter" if unsplit).
+        - "text": The LaTeX text for this section.
+    """
+    if len(chapter_text) <= char_threshold:
+        return [
+            {"section_idx": 0, "title": "Full Chapter", "text": chapter_text}
+        ]
+
+    boundaries = list(SUBSECTION_PATTERN.finditer(chapter_text))
+
+    if not boundaries:
+        # No subsections found — return whole chapter as one chunk
+        return [
+            {"section_idx": 0, "title": "Full Chapter", "text": chapter_text}
+        ]
+
+    sections: list[dict[str, Any]] = []
+
+    # Content before the first subsection (chapter intro / preamble material)
+    pre_text = chapter_text[: boundaries[0].start()].strip()
+    if pre_text:
+        sections.append(
+            {"section_idx": 0, "title": "Chapter Introduction", "text": pre_text}
+        )
+
+    for i, boundary in enumerate(boundaries):
+        start = boundary.start()
+        end = boundaries[i + 1].start() if i + 1 < len(boundaries) else len(chapter_text)
+        title = boundary.group(1).strip()
+        sections.append(
+            {
+                "section_idx": len(sections),
+                "title": title,
+                "text": chapter_text[start:end].strip(),
+            }
+        )
+
+    return sections
+
+
 def extract_preamble(source_path: Path) -> str:
     """
     Extract the LaTeX preamble (everything before \\begin{document}).

@@ -30,13 +30,14 @@ from dotenv import load_dotenv
 
 from agent_session import MODELS, load_prompt, run_agent
 from config_loader import load_course_config, CourseConfig
-from latex_parser import split_into_chapters, extract_preamble
+from latex_parser import split_into_chapters, split_into_sections, extract_preamble
 from kb_writer import (
     ensure_kb_dir,
     ensure_solutions_dir,
     ensure_exports_dir,
     validate_jsonl_output,
     read_jsonl,
+    write_jsonl,
     write_json,
 )
 from sheet_parser import parse_sheet, format_problem_for_display
@@ -48,30 +49,28 @@ load_dotenv()
 # ── KB BUILD PIPELINE ──────────────────────────────────────────────
 
 
-async def run_kb_extraction(
-    chapter_text: str,
-    chapter_config: dict[str, Any],
+async def _run_section_extraction(
+    section_text: str,
+    section_title: str,
+    section_idx: int,
+    chapter_id: int,
     course_config: CourseConfig,
-    output_dir: Path,
+    work_dir: Path,
     model: str,
     preamble: str = "",
-) -> dict[str, Any]:
-    """Run KB extraction for a single chapter."""
+) -> list[dict[str, Any]]:
+    """
+    Run KB extraction on a single section chunk.
+
+    Returns the list of extracted records (parsed from JSONL).
+    """
     course_id = course_config["course_id"]
-    chapter_id = chapter_config["id"]
-    chapter_title = chapter_config["title"]
-
-    kb_dir = ensure_kb_dir(output_dir, course_id, chapter_id)
-
-    # Write chapter source for the agent to read
-    source_file = kb_dir / "chapter_source.tex"
-    source_file.write_text(chapter_text, encoding="utf-8")
-
-    if preamble:
-        (kb_dir / "preamble.tex").write_text(preamble, encoding="utf-8")
-
-    output_file = kb_dir / "kb.jsonl"
     system_prompt = load_prompt("kb_builder_prompt")
+
+    # Each section gets its own source + output file to avoid collisions
+    source_file = work_dir / f"section_{section_idx}_source.tex"
+    output_file = work_dir / f"section_{section_idx}_kb.jsonl"
+    source_file.write_text(section_text, encoding="utf-8")
 
     # Build notation context
     notation_overrides = course_config.get("notation_overrides", {})
@@ -88,46 +87,132 @@ async def run_kb_extraction(
             "definitions. Read it first for notation context.\n"
         )
 
-    task_message = f"""Extract all mathematical objects from the chapter source file.
+    task_message = f"""Extract all mathematical objects from the section source file.
 
 **Course:** {course_config["course_name"]} ({course_id})
-**Chapter {chapter_id}:** {chapter_title}
-**Source file:** chapter_source.tex
-**Output file:** kb.jsonl
+**Chapter {chapter_id}, Section:** {section_title}
+**Source file:** {source_file.name}
+**Output file:** {output_file.name}
 {notation_section}{preamble_note}
 Instructions:
-1. {"Read `preamble.tex` first, then read" if preamble else "Read"} `chapter_source.tex`.
+1. {"Read `preamble.tex` first, then read" if preamble else "Read"} `{source_file.name}`.
 2. Identify ALL definitions, theorems, lemmas, propositions, corollaries, examples, and remarks.
 3. For each, extract ALL structured fields including intuition, mechanism, triggers, and pitfalls.
 4. Use the ID format: `{course_id}.ch{chapter_id}.<type_abbrev>.<number>`
-5. Write the complete JSONL to `kb.jsonl` — one JSON object per line, NO wrapping array, NO markdown fences.
+5. Write the complete JSONL to `{output_file.name}` — one JSON object per line, NO wrapping array, NO markdown fences.
 6. Report a summary: count of each type, any items with confidence < 0.80, and any difficulties.
 
 Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOOD intuition — this is the most valuable output."""
 
-    print(f"\n{'='*60}")
-    print(f"  Chapter {chapter_id}: {chapter_title}")
-    print(f"  Source: {len(chapter_text):,} characters")
-    print(f"  Output: {output_file}")
-    print(f"{'='*60}\n")
+    print(f"    Section {section_idx}: {section_title} ({len(section_text):,} chars)")
 
-    result = await run_agent(
+    await run_agent(
         system_prompt=system_prompt,
         task_message=task_message,
-        cwd=kb_dir,
+        cwd=work_dir,
         model=model,
         max_turns=60,
     )
 
-    # Validate output
+    if output_file.exists():
+        return read_jsonl(output_file)
+    return []
+
+
+async def run_kb_extraction(
+    chapter_text: str,
+    chapter_config: dict[str, Any],
+    course_config: CourseConfig,
+    output_dir: Path,
+    model: str,
+    preamble: str = "",
+) -> dict[str, Any]:
+    """
+    Run KB extraction for a single chapter.
+
+    Large chapters are automatically split into subsection-level chunks
+    and processed independently, then merged into one kb.jsonl.
+    """
+    course_id = course_config["course_id"]
+    chapter_id = chapter_config["id"]
+    chapter_title = chapter_config["title"]
+
+    kb_dir = ensure_kb_dir(output_dir, course_id, chapter_id)
+
+    if preamble:
+        (kb_dir / "preamble.tex").write_text(preamble, encoding="utf-8")
+
+    output_file = kb_dir / "kb.jsonl"
+
+    # Split chapter into sections (returns 1 chunk if small enough)
+    sections = split_into_sections(chapter_text, chapter_id)
+
+    print(f"\n{'='*60}")
+    print(f"  Chapter {chapter_id}: {chapter_title}")
+    print(f"  Source: {len(chapter_text):,} characters")
+    if len(sections) > 1:
+        print(f"  Chunked into {len(sections)} sections for parallel extraction")
+    print(f"  Output: {output_file}")
+    print(f"{'='*60}\n")
+
+    start_time = time.time()
+
+    if len(sections) == 1:
+        # Small chapter — single extraction (original behaviour)
+        all_records = await _run_section_extraction(
+            section_text=sections[0]["text"],
+            section_title=sections[0]["title"],
+            section_idx=0,
+            chapter_id=chapter_id,
+            course_config=course_config,
+            work_dir=kb_dir,
+            model=model,
+            preamble=preamble,
+        )
+    else:
+        # Large chapter — extract each section concurrently, then merge
+        tasks = [
+            _run_section_extraction(
+                section_text=sec["text"],
+                section_title=sec["title"],
+                section_idx=sec["section_idx"],
+                chapter_id=chapter_id,
+                course_config=course_config,
+                work_dir=kb_dir,
+                model=model,
+                preamble=preamble,
+            )
+            for sec in sections
+        ]
+        results = await asyncio.gather(*tasks)
+        all_records = [rec for section_recs in results for rec in section_recs]
+
+    duration = round(time.time() - start_time, 1)
+
+    # Deduplicate by ID (in case sections overlap at boundaries)
+    seen_ids: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for rec in all_records:
+        rid = rec.get("id", "")
+        if rid and rid in seen_ids:
+            continue
+        seen_ids.add(rid)
+        deduped.append(rec)
+
+    # Write merged output
+    write_jsonl(output_file, deduped)
+
+    # Validate merged output
+    records = validate_jsonl_output(output_file)
+
     stats: dict[str, Any] = {
         "chapter_id": chapter_id,
         "title": chapter_title,
-        "duration_seconds": result["duration_seconds"],
+        "duration_seconds": duration,
+        "sections_processed": len(sections),
     }
 
-    if output_file.exists():
-        records = validate_jsonl_output(output_file)
+    if records:
         stats["total_records"] = len(records)
         stats["by_type"] = {}
         for r in records:
@@ -147,6 +232,9 @@ Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOO
     else:
         stats["status"] = "no_output"
         stats["total_records"] = 0
+
+    if len(sections) > 1:
+        print(f"\n  Merged {len(deduped)} records from {len(sections)} sections")
 
     return stats
 
