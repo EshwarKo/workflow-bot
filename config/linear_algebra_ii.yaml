@@ -1,0 +1,39 @@
+# MathPipe Course Configuration
+# Linear Algebra II — Richard Earl, Hilary Term 2026
+
+course_id: "linalg_ii_ht2026"
+course_name: "Linear Algebra II"
+term: "HT2026"
+
+source_tex: "notes/linear_algebra_ii.tex"
+
+chapters:
+  - id: 0
+    title: "Introduction and Preliminary Material"
+    prerequisites: []
+
+  - id: 1
+    title: "Determinants"
+    prerequisites: [0]
+
+  - id: 2
+    title: "Eigenvalues, Eigenvectors and Diagonalizability"
+    prerequisites: [1]
+
+  - id: 3
+    title: "The Spectral Theorem"
+    prerequisites: [1, 2]
+
+sheets: []
+
+notation_overrides:
+  "A_{IJ}": "the (n-1)x(n-1) minor of A obtained by removing row I and column J"
+  "\\det": "determinant"
+  "\\operatorname{tr}": "trace"
+  "\\chi_A(\\lambda)": "characteristic polynomial of A"
+  "P^{-1}AP": "change of basis / similarity transform"
+  "\\mathbb{R}^n_{\\text{col}}": "column vectors in R^n"
+  "A^T": "transpose of A"
+  "A^+": "Moore-Penrose pseudoinverse of A"
+  "\\langle \\cdot, \\cdot \\rangle": "inner product"
+  "\\|\\cdot\\|": "Euclidean norm"
