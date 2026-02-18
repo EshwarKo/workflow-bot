@@ -12,15 +12,17 @@ from typing import Any
 
 
 # Patterns for chapter/section boundaries in LaTeX
+# The \*? handles starred variants like \section*{...}
 CHAPTER_PATTERNS = [
-    r"\\chapter\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
-    r"\\section\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
-    r"\\part\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
+    r"\\chapter\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
+    r"\\section\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
+    r"\\part\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
 ]
 
 # Combined pattern that matches any chapter-like boundary
+# Handles starred variants (\section*{...}) and optional short titles (\section[short]{long})
 BOUNDARY_PATTERN = re.compile(
-    r"\\(?:chapter|section|part)\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
+    r"\\(?:chapter|section|part)\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}",
     re.MULTILINE,
 )
 
@@ -30,6 +32,10 @@ def _normalise_title(title: str) -> str:
     # Remove LaTeX commands, extra whitespace, and normalise case
     cleaned = re.sub(r"\\[a-zA-Z]+\s*", "", title)
     cleaned = re.sub(r"[{}]", "", cleaned)
+    # Strip leading section numbers like "0.", "1.", "2.1"
+    cleaned = re.sub(r"^\s*[\d.]+\s*", "", cleaned)
+    # Strip trailing periods
+    cleaned = cleaned.rstrip(".")
     cleaned = re.sub(r"\s+", " ", cleaned).strip().lower()
     return cleaned
 
