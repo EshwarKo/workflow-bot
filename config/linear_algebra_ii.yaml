@@ -8,21 +8,21 @@ term: "HT2026"
 source_tex: "notes/linear_algebra_ii.tex"
 
 chapters:
-  - id: 0
+  - id: 1
     title: "Introduction and Preliminary Material"
     prerequisites: []
 
-  - id: 1
-    title: "Determinants"
-    prerequisites: [0]
-
   - id: 2
-    title: "Eigenvalues, Eigenvectors and Diagonalizability"
+    title: "Determinants"
     prerequisites: [1]
 
   - id: 3
+    title: "Eigenvalues, Eigenvectors and Diagonalizability"
+    prerequisites: [2]
+
+  - id: 4
     title: "The Spectral Theorem"
-    prerequisites: [1, 2]
+    prerequisites: [2, 3]
 
 sheets: []
 
