@@ -674,11 +674,13 @@ Commands:
   kb      Build knowledge base from LaTeX source
   sheet   Process a problem sheet (route, solve, verify, output)
   export  Generate study materials from the KB (study notes, Anki, tricks)
+  pdf     Compile solution files into a formatted PDF
 
 Examples:
   python mathpipe.py kb --config config/course.yaml --source notes.tex
   python mathpipe.py sheet --config config/course.yaml --sheet sheet1.tex
   python mathpipe.py export --config config/course.yaml --format anki
+  python mathpipe.py pdf solutions/linalg_ii_ht2026/sheet_1
         """,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -713,7 +715,33 @@ Examples:
                           help="Export format")
     export_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
 
+    # ── pdf ──
+    pdf_p = subparsers.add_parser("pdf", help="Compile solution files into a formatted PDF")
+    pdf_p.add_argument("work_dir", type=Path, help="Directory containing solution_N.json files")
+    pdf_p.add_argument("-o", "--output", type=Path, default=None, help="Output PDF path")
+    pdf_p.add_argument("--title", type=str, default=None, help="Document title")
+    pdf_p.add_argument("--subtitle", type=str, default=None, help="Document subtitle")
+
     return parser
+
+
+def cmd_pdf(args: argparse.Namespace) -> int:
+    """Compile solution files into a formatted PDF."""
+    from compile_pdf import compile_pdf
+
+    if not args.work_dir.is_dir():
+        print(f"Error: Not a directory: {args.work_dir}")
+        return 1
+
+    out = compile_pdf(
+        work_dir=args.work_dir,
+        output_path=args.output,
+        title=args.title,
+        subtitle=args.subtitle,
+    )
+    size_kb = out.stat().st_size / 1024
+    print(f"PDF compiled: {out} ({size_kb:.0f} KB)")
+    return 0
 
 
 def main() -> int:
@@ -722,7 +750,7 @@ def main() -> int:
     args = parser.parse_args()
 
     # Validate common inputs
-    if not args.config.exists():
+    if hasattr(args, "config") and args.config and not args.config.exists():
         print(f"Error: Config not found: {args.config}")
         return 1
 
@@ -739,10 +767,15 @@ def main() -> int:
         "kb": cmd_kb,
         "sheet": cmd_sheet,
         "export": cmd_export,
+        "pdf": lambda a: asyncio.coroutine(lambda: cmd_pdf(a))() if False else cmd_pdf(a),
     }
 
+    handler = handlers[args.command]
+
     try:
-        return asyncio.run(handlers[args.command](args))
+        if args.command == "pdf":
+            return handler(args)
+        return asyncio.run(handler(args))
     except KeyboardInterrupt:
         print("\n\nInterrupted. Partial output may be available.")
         return 130
