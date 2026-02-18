@@ -7,6 +7,7 @@ Extracts the common pattern of creating a client, sending a message,
 streaming the response, and returning results.
 """
 
+import os
 import time
 import traceback
 from pathlib import Path
@@ -75,6 +76,12 @@ async def run_agent(
 
     if tools is None:
         tools = ["Read", "Write", "Glob", "Grep"]
+
+    # Ensure max output tokens is set high enough for large extractions.
+    # The SDK defaults to 32000 which is too small for chapters with many
+    # theorems/definitions (e.g. 50k+ char chapters).
+    if "CLAUDE_CODE_MAX_OUTPUT_TOKENS" not in os.environ:
+        os.environ["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = "128000"
 
     client = ClaudeSDKClient(
         options=ClaudeAgentOptions(
