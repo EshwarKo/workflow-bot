@@ -1,15 +1,8 @@
-# MathPipe & Claude Engineer
+# MathPipe
 
-This repository contains two autonomous agent systems built on the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python):
+An autonomous mathematics pipeline built on the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that converts LaTeX lecture notes and problem sheets into structured knowledge bases, verified solutions, and publication-quality PDF solution books.
 
-1. **MathPipe** — An autonomous mathematics pipeline that converts LaTeX lecture notes and problem sheets into structured knowledge bases, verified solutions, and publication-quality PDF solution books.
-2. **Claude Engineer** — A long-running autonomous software engineer that manages projects via Linear, writes code, commits to GitHub, and communicates progress via Slack.
-
----
-
-## MathPipe
-
-MathPipe is an end-to-end pipeline for university-level mathematics. Given LaTeX source material (lecture notes + problem sheets), it:
+Given LaTeX source material (lecture notes + problem sheets), MathPipe:
 
 - Extracts a structured **knowledge base** of definitions, theorems, proofs, and techniques
 - **Solves** problem sheets with multiple strategies, tiered hints, and step-by-step breakdowns
@@ -17,7 +10,7 @@ MathPipe is an end-to-end pipeline for university-level mathematics. Given LaTeX
 - Generates **study materials** (notes, Anki cards, trick banks)
 - Compiles everything into **publication-quality PDFs** with properly rendered LaTeX math (via MathJax SVG)
 
-### Pipeline Flowchart
+## Pipeline Flowchart
 
 ```mermaid
 flowchart TB
@@ -84,7 +77,7 @@ flowchart TB
     style EXPORT fill:#f5f0ff,stroke:#5a3a8c,color:#1a1a1a
 ```
 
-### Quick Start
+## Quick Start
 
 ```bash
 # 1. Install dependencies
@@ -110,7 +103,7 @@ python mathpipe.py export \
   --format study  # or: anki, tricks
 ```
 
-### Course Configuration
+## Course Configuration
 
 Each course is defined by a YAML config file in `config/`:
 
@@ -137,7 +130,7 @@ notation_overrides:
   "\\tr": "trace"
 ```
 
-### MathPipe Architecture
+## Architecture
 
 | Component | File | Purpose |
 |-----------|------|---------|
@@ -151,9 +144,9 @@ notation_overrides:
 | **PDF Compiler** | `compile_pdf.py` | Two-pass LaTeX-to-SVG-to-PDF renderer (MathJax + WeasyPrint) |
 | **Math Renderer** | `math_to_svg.js` | Node.js batch LaTeX-to-SVG using MathJax |
 
-### MathPipe Agents
+## Agents
 
-All MathPipe agents run via `agent_session.run_agent()` with only file tools (Read, Write, Glob, Grep) — no Bash, no MCP servers.
+All agents run via `agent_session.run_agent()` with only file tools (Read, Write, Glob, Grep) — no Bash, no MCP servers.
 
 | Agent | Prompt | Default Model | Role |
 |-------|--------|---------------|------|
@@ -162,7 +155,7 @@ All MathPipe agents run via `agent_session.run_agent()` with only file tools (Re
 | **Verifier** | `prompts/verifier_prompt.md` | Sonnet | Adversarial verification: structural, adversarial, and consistency checks |
 | **Output** | `prompts/output_prompt.md` | Haiku | Generate study notes, Anki cards, trick banks, or progressive hints |
 
-### PDF Math Rendering
+## PDF Math Rendering
 
 The PDF compiler uses a two-pass architecture for high-quality math:
 
@@ -171,7 +164,7 @@ The PDF compiler uses a two-pass architecture for high-quality math:
 3. **Pass 2 (Substitute):** Placeholders are replaced with inline SVGs in the HTML
 4. **PDF:** WeasyPrint converts the SVG-rich HTML to a publication-quality PDF
 
-### Output Directory Structure
+## Output Directory Structure
 
 ```
 kb/{course_id}/
@@ -193,182 +186,29 @@ exports/{course_id}/
   trick_bank.jsonl         # Transferable problem-solving techniques
 ```
 
----
-
-## Claude Engineer
-
-An autonomous software engineer that manages projects, writes code, and communicates progress.
-
-### Engineer Pipeline Flowchart
-
-```mermaid
-flowchart TB
-    subgraph HARNESS["Agent Harness Loop"]
-        direction TB
-        INIT["autonomous_agent_demo.py<br/>Parse CLI args, validate keys"]
-        CREATE["client.py<br/>Create ClaudeSDKClient<br/>+ 2 MCP servers<br/>+ 4 sub-agents"]
-        LOOP{"Session Loop<br/>(until PROJECT_COMPLETE<br/>or max iterations)"}
-        FIRST["First run →<br/>initializer_task.md"]
-        CONT["Continuation →<br/>continuation_task.md"]
-        SESSION["run_agent_session()<br/>Stream orchestrator response"]
-        COMPLETE["PROJECT_COMPLETE:<br/>signal detected"]
-
-        INIT --> CREATE --> LOOP
-        LOOP -->|"iteration 1"| FIRST --> SESSION
-        LOOP -->|"iteration N"| CONT --> SESSION
-        SESSION --> LOOP
-        LOOP -->|"done"| COMPLETE
-    end
-
-    subgraph ORCHESTRATOR["Orchestrator (Haiku)"]
-        direction TB
-        ORCH["orchestrator_prompt.md<br/>Coordinates agents via Task tool"]
-    end
-
-    subgraph AGENTS["Specialized Sub-Agents"]
-        direction LR
-        LINEAR["Linear Agent<br/><em>Haiku</em><br/>39 Arcade tools<br/>Issues, status, META"]
-        CODING["Coding Agent<br/><em>Sonnet</em><br/>Read/Write/Bash<br/>+ Playwright MCP"]
-        GITHUB["GitHub Agent<br/><em>Haiku</em><br/>46 Arcade tools<br/>Commits, PRs"]
-        SLACK["Slack Agent<br/><em>Haiku</em><br/>8 Arcade tools<br/>Notifications"]
-    end
-
-    subgraph MCP["MCP Servers"]
-        direction LR
-        ARCADE["Arcade Gateway<br/>(HTTP)<br/>Linear + GitHub + Slack"]
-        PLAYWRIGHT["Playwright<br/>(stdio)<br/>Browser automation"]
-    end
-
-    SESSION --> ORCH
-    ORCH --> LINEAR
-    ORCH --> CODING
-    ORCH --> GITHUB
-    ORCH --> SLACK
-    LINEAR --> ARCADE
-    GITHUB --> ARCADE
-    SLACK --> ARCADE
-    CODING --> PLAYWRIGHT
-
-    style HARNESS fill:#e8f0f8,stroke:#1a3a5c,color:#1a1a1a
-    style ORCHESTRATOR fill:#fff8e1,stroke:#8a6d00,color:#1a1a1a
-    style AGENTS fill:#f0faf0,stroke:#1a7a3a,color:#1a1a1a
-    style MCP fill:#f5f0ff,stroke:#5a3a8c,color:#1a1a1a
-```
-
-### Quick Start
-
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env with ARCADE_API_KEY, ARCADE_GATEWAY_SLUG, ARCADE_USER_ID
-
-# 3. Authorize Arcade services (once)
-python authorize_arcade.py
-
-# 4. Run the agent
-uv run python autonomous_agent_demo.py --project-dir my-app
-
-# Options
-uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
-uv run python autonomous_agent_demo.py --project-dir my-app --model opus
-```
-
-### Key Features
-
-- **Long-running autonomy** via harness architecture with multi-iteration sessions
-- **Multi-agent orchestration**: Linear, Coding, GitHub, and Slack agents coordinated by an orchestrator
-- **Linear integration**: Automatic issue tracking with real-time status updates
-- **GitHub integration**: Commits, branches, and PR creation
-- **Slack notifications**: Progress updates delivered to your team
-- **Arcade MCP gateway**: Single OAuth flow for all external services
-- **Browser testing**: Playwright MCP for automated UI verification
-- **Defense-in-depth security**: OS sandbox + filesystem restrictions + bash allowlist + MCP permissions
-
-### Agent Responsibilities
-
-| Agent | Model | Tools | Role |
-|-------|-------|-------|------|
-| **Orchestrator** | Haiku | Delegates via Task tool | Reads project state, decides what to work on, coordinates sub-agents |
-| **Linear** | Haiku | 39 Linear Arcade tools + file tools | Create/update issues, manage META issue, session handoffs |
-| **Coding** | Sonnet | File tools + Bash + Playwright | Write code, test via browser, screenshot verification |
-| **GitHub** | Haiku | 46 GitHub Arcade tools + Bash | Commits, branches, PRs (requires `GITHUB_REPO`) |
-| **Slack** | Haiku | 8 Slack Arcade tools + file tools | Progress notifications (requires `SLACK_CHANNEL`) |
-
-### Customization
-
-- **Change the app to build**: Edit `prompts/app_spec.txt`
-- **Adjust issue count**: Edit `prompts/initializer_task.md`
-- **Modify allowed commands**: Edit `security.py` `ALLOWED_COMMANDS`
-
-<details>
-<summary><strong>Environment Variables Reference</strong></summary>
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `ARCADE_API_KEY` | Arcade API key | Yes |
-| `ARCADE_GATEWAY_SLUG` | Arcade MCP gateway slug | Yes |
-| `ARCADE_USER_ID` | Your email for user tracking | Recommended |
-| `GENERATIONS_BASE_PATH` | Base directory for generated projects (default: `./generations`) | No |
-| `GITHUB_REPO` | GitHub repo `owner/repo` for auto-push | No |
-| `SLACK_CHANNEL` | Slack channel name (without #) | No |
-| `ORCHESTRATOR_MODEL` | Orchestrator model: haiku, sonnet, opus | No |
-| `LINEAR_AGENT_MODEL` | Linear agent model | No |
-| `CODING_AGENT_MODEL` | Coding agent model | No |
-| `GITHUB_AGENT_MODEL` | GitHub agent model | No |
-| `SLACK_AGENT_MODEL` | Slack agent model | No |
-
-</details>
-
----
-
 ## Project Structure
 
 ```
-workflow-bot/
-├── mathpipe.py                  # MathPipe CLI entry point
-├── compile_pdf.py               # PDF compiler (also standalone CLI)
-├── sheet_parser.py              # LaTeX problem sheet parser
-├── latex_parser.py              # LaTeX chapter/section splitter
-├── router.py                    # KB retrieval & routing
-├── kb_writer.py                 # JSONL KB read/write utilities
-├── config_loader.py             # YAML course config loader
-├── agent_session.py             # MathPipe agent session runner
-├── math_to_svg.js               # Node.js MathJax LaTeX→SVG renderer
-│
-├── autonomous_agent_demo.py     # Claude Engineer CLI entry point
-├── agent.py                     # Autonomous agent session loop
-├── client.py                    # SDK client factory (MCP + agents)
-├── security.py                  # Bash command allowlist & hooks
-├── progress.py                  # Linear project state tracker
-├── prompts.py                   # Prompt loading utilities
-├── arcade_config.py             # Arcade MCP gateway config
-├── authorize_arcade.py          # OAuth authorization CLI
-├── test_security.py             # Security hook unit tests
-│
-├── agents/
-│   ├── __init__.py              # Agent definitions package
-│   └── definitions.py           # Linear, Coding, GitHub, Slack agents
+mathpipe/
+├── mathpipe.py              # CLI entry point (kb, sheet, export, pdf)
+├── compile_pdf.py           # PDF compiler (also standalone CLI)
+├── sheet_parser.py          # LaTeX problem sheet parser
+├── latex_parser.py          # LaTeX chapter/section splitter
+├── router.py                # KB retrieval & routing
+├── kb_writer.py             # JSONL KB read/write utilities
+├── config_loader.py         # YAML course config loader
+├── agent_session.py         # Agent session runner (Claude Agent SDK)
+├── math_to_svg.js           # Node.js MathJax LaTeX→SVG renderer
 │
 ├── config/
 │   ├── linear_algebra_ii.yaml           # Linear Algebra II course config
 │   └── example_functional_analysis.yaml # Functional Analysis example config
 │
 ├── prompts/
-│   ├── kb_builder_prompt.md     # MathPipe: KB extraction prompt
-│   ├── solver_prompt.md         # MathPipe: problem solver prompt
-│   ├── verifier_prompt.md       # MathPipe: adversarial verifier prompt
-│   ├── output_prompt.md         # MathPipe: study material generator prompt
-│   ├── app_spec.txt             # Claude Engineer: app specification
-│   ├── orchestrator_prompt.md   # Claude Engineer: orchestrator system prompt
-│   ├── initializer_task.md      # Claude Engineer: first-session task
-│   ├── continuation_task.md     # Claude Engineer: continuation task
-│   ├── linear_agent_prompt.md   # Claude Engineer: Linear sub-agent prompt
-│   ├── coding_agent_prompt.md   # Claude Engineer: Coding sub-agent prompt
-│   ├── github_agent_prompt.md   # Claude Engineer: GitHub sub-agent prompt
-│   └── slack_agent_prompt.md    # Claude Engineer: Slack sub-agent prompt
+│   ├── kb_builder_prompt.md     # KB extraction agent prompt
+│   ├── solver_prompt.md         # Problem solver agent prompt
+│   ├── verifier_prompt.md       # Adversarial verifier agent prompt
+│   └── output_prompt.md         # Study material generator agent prompt
 │
 ├── notes/
 │   └── linear_algebra_ii.tex    # Real lecture notes (Linear Algebra II)
@@ -387,7 +227,6 @@ workflow-bot/
 
 - Python 3.11+
 - Node.js 18+ (for MathJax math rendering in PDFs)
-- [Claude Code CLI](https://github.com/anthropics/claude-code) (latest)
 - [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python)
 
 ```bash
