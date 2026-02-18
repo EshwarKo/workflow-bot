@@ -141,7 +141,7 @@ def _parse_by_enumerate(text: str) -> list[dict[str, Any]]:
     BEGIN = r"\begin{enumerate}"
     END = r"\end{enumerate}"
 
-    # Find ALL outermost enumerate blocks
+    # Find ALL outermost enumerate blocks, tracking positions in original text
     blocks: list[dict[str, Any]] = []
     pos = 0
     while pos < len(text):
@@ -170,11 +170,13 @@ def _parse_by_enumerate(text: str) -> list[dict[str, Any]]:
                     body_end = next_end
                 i = next_end + len(END)
 
+        outer_end = body_end + len(END) if body_end < len(text) else len(text)
         blocks.append({
             "body": text[body_start:body_end],
             "outer_start": outer_start,
+            "outer_end": outer_end,
         })
-        pos = body_end + len(END) if body_end < len(text) else len(text)
+        pos = outer_end
 
     if not blocks:
         return []
@@ -233,7 +235,107 @@ def _parse_by_enumerate(text: str) -> list[dict[str, Any]]:
                 })
                 global_item_count = prob_num
 
+    # Attach inter-block content (e.g. displayed matrices between enumerate blocks)
+    # to the last problem of the preceding block.  Oxford sheets commonly place
+    # \[ ... \] display math outside the enumerate environment.
+    if problems:
+        _attach_interblock_content(text, blocks, problems)
+
     return problems
+
+
+def _is_meaningful_content(content: str) -> bool:
+    """Check if inter-block text contains mathematical or problem content."""
+    # Strip structural LaTeX commands that aren't part of problem statements
+    stripped = re.sub(
+        r"\\(?:sub)*section\*?\{[^}]*\}", "", content
+    )
+    stripped = re.sub(
+        r"\\(?:bigskip|medskip|smallskip|vspace\{[^}]*\}|newpage|clearpage|noindent)\b",
+        "", stripped,
+    )
+    return bool(stripped.strip())
+
+
+def _attach_interblock_content(
+    text: str,
+    blocks: list[dict[str, Any]],
+    problems: list[dict[str, Any]],
+) -> None:
+    """Append content between enumerate blocks to the last problem of the preceding block."""
+    for i in range(len(blocks) - 1):
+        gap = text[blocks[i]["outer_end"]: blocks[i + 1]["outer_start"]]
+        if _is_meaningful_content(gap):
+            # Find the last problem whose id came from block i.
+            # That problem's statement should be extended.
+            # We identify it by the id range: block i produced problems with ids
+            # starting after the previous block's last id.  The simplest approach
+            # is to just extend the last problem that was added *before* block i+1
+            # contributed any items, but since we appended sequentially, we can
+            # use the block boundary: the last problem with id <= first id of
+            # block i+1's items (if any) minus 1, or simply the last problem
+            # that existed after processing block i.
+            #
+            # A robust approach: walk backwards from the end of problems to find
+            # one whose id is <= the start_num of the next block.
+            _append_to_last_problem_before_block(problems, blocks, i, gap.strip())
+
+    # Also handle trailing content after the last enumerate block
+    trailing = text[blocks[-1]["outer_end"]:]
+    if _is_meaningful_content(trailing):
+        problems[-1]["statement"] += "\n" + trailing.strip()
+        problems[-1]["raw_latex"] += "\n" + trailing.strip()
+
+
+def _append_to_last_problem_before_block(
+    problems: list[dict[str, Any]],
+    blocks: list[dict[str, Any]],
+    block_idx: int,
+    content: str,
+) -> None:
+    """Append inter-block content to the last problem that came from block_idx."""
+    # The next block (block_idx+1) may have a setcounter that tells us its
+    # first problem number.  Any problem with id < that number came from
+    # an earlier block.
+    next_body = blocks[block_idx + 1]["body"]
+    sc = re.search(r"\\setcounter\{enumi\}\{(\d+)\}", next_body)
+    if sc:
+        next_first_id = int(sc.group(1)) + 1
+        # Find last problem with id < next_first_id
+        for p in reversed(problems):
+            if p["id"] < next_first_id:
+                p["statement"] += "\n" + content
+                p["raw_latex"] += "\n" + content
+                return
+
+    # Fallback: attach to whatever problem was last before the gap.
+    # Walk backwards to find a problem whose id is plausibly from block_idx.
+    # Since problems are in order, the problem just before the first one from
+    # block_idx+1 is the right target.  We can approximate by finding the
+    # first problem whose id matches the next block's items and taking the one
+    # before it.
+    next_start = blocks[block_idx + 1]["outer_start"]
+    # Count how many problems came from blocks 0..block_idx by checking
+    # which problems exist before the next block's first item would appear.
+    # Simplest: just append to the last problem we have so far that isn't
+    # from a later block.  Since we process blocks in order and this function
+    # is called after all blocks are processed, we need a different approach.
+    #
+    # Safe fallback: find the last problem added from any block up to block_idx.
+    # Since problems are appended in block order, the first problem from
+    # block_idx+1 is the one with the smallest id > all block_idx problems.
+    # Without setcounter, blocks are numbered sequentially, so the boundary
+    # is: count items in blocks 0..block_idx.
+    items_before = 0
+    for bi in range(block_idx + 1):
+        body = blocks[bi]["body"]
+        # Count \item occurrences at depth 0 (approximate)
+        items_before += len(re.findall(r"\\item(?![a-zA-Z])", body))
+
+    if items_before > 0 and items_before <= len(problems):
+        target = problems[items_before - 1]
+        target["statement"] += "\n" + content
+        target["raw_latex"] += "\n" + content
 
 
 def _extract_parts(statement: str) -> list[dict[str, str]]:
