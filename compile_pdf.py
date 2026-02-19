@@ -158,14 +158,16 @@ _UNICODE_MISC = {
 
 # Characters that signal "this must be in math mode"
 _MATH_TRIGGER_RE = re.compile(
-    r'[_^]'
+    r'(?<!\\)[_^]'
     r'|\\(?:alpha|beta|gamma|delta|varepsilon|epsilon|zeta|eta|theta'
     r'|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|varphi|phi'
     r'|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega'
     r'|leq|geq|neq|in|notin|subset|supset|subseteq|supseteq'
     r'|cup|cap|oplus|otimes|to|mapsto|cdot|times|div|pm|mp'
-    r'|infty|emptyset|partial|nabla|ldots|cdots'
+    r'|infty|emptyset|partial|nabla|ldots|cdots|vdots|ddots'
+    r'|frac|sqrt|sum|prod|int|det|ker|dim|rank|tr|diag|sgn'
     r'|mathbb|mathcal|mathfrak|operatorname'
+    r'|checkmark|triangle'
     r'|Rightarrow|Leftarrow|Leftrightarrow|forall|exists)\b'
 )
 
@@ -180,7 +182,7 @@ _LATEX_MATH_OPS = (
 # A "math token": variable or command with optional subscripts/superscripts
 _MATH_TOKEN = (
     r'(?:\d*(?:[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?)'
-    r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
+    r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
     r'(?:\([^)]*\))?)'
 )
 
@@ -310,14 +312,19 @@ def _apply_to_non_math(text: str, fn) -> str:
 def _pattern_subscript_superscript(text: str) -> str:
     """Pattern 1: wrap variables/commands that have subscripts or superscripts.
 
-    Matches D_n, D_{n-1}, C_{11}, x^2, A^T, 2D_{n-1}, \\chi_J, etc.
+    Matches D_n, D_{n-1}, C_{11}, x^2, A^T, 2D_{n-1}, \\chi_J,
+    1^n, (r-1)^{2}, (-1)^{1+j}, etc.
     Does NOT match bare commands like \\geq or \\lambda (no script) —
     those are handled by Pattern 2 or 3.
     """
-    # Require at least one subscript/superscript (note the + not *)
+    # Base can be: letters, digits, LaTeX command, or parenthesized expression
+    _BASE = (
+        r'(?:\d+|[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?|\([^)]*\))'
+    )
+    # Optional digit prefix (e.g. 2D_{n-1})
     _TOKEN_WITH_SCRIPT = (
-        r'(?:\d*(?:[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?)'
-        r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))+'
+        r'(?:\d*' + _BASE +
+        r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))+'
         r'(?:\([^)]*\))?)'
     )
     return re.sub(
@@ -337,12 +344,13 @@ def _pattern_standalone_commands(text: str) -> str:
         r'alpha|beta|gamma|delta|varepsilon|epsilon|zeta|eta|theta'
         r'|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|varphi|phi'
         r'|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega'
-        r'|infty|emptyset|partial|nabla'
+        r'|infty|emptyset|partial|nabla|ldots|cdots|vdots|ddots'
+        r'|checkmark|triangle'
         r'|mathbb\{[^}]*\}|mathcal\{[^}]*\}|mathfrak\{[^}]*\}'
     )
     return re.sub(
         r'(\\(?:' + _STANDALONE + r')'
-        r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
+        r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
         r')'
         r'(?![a-zA-Z])',
         r'$\1$',
@@ -399,12 +407,61 @@ def _merge_math_blocks(text: str) -> str:
         changed = new != result
         result = new
 
+    # Merge  $A$$B$  or  $A$ $B$  (adjacent with optional whitespace)  →  $A B$
+    changed = True
+    while changed:
+        new = re.sub(r'\$([^$]+)\$\s*\$([^$]+)\$', r'$\1 \2$', result)
+        changed = new != result
+        result = new
+
+    # Merge  $A$ gap $B$  where gap is "math-like" text (operators, parens,
+    # digits, short identifiers, \cdot, ^{}, etc.) — not plain English.
+    _MATH_GAP = (
+        r'(?:'
+        r'[=+\-*/,<>|().\[\]:;!?^_{}\s\d]'  # operators, parens, braces, digits, ws
+        r'|\\(?:cdot|times|div|pm|mp|leq|geq|neq|in|notin|to|mapsto'
+        r'|ldots|cdots|quad|qquad|enspace|;|,)'   # LaTeX math commands
+        r'|[A-Za-z](?![A-Za-z]{2})'          # single letter (not part of 3+ word)
+        r')+'
+    )
+    # Condition: gap must contain a math operator AND no English words (3+ letters)
+    _GAP_OPERATOR_RE = re.compile(
+        r'[=+\-*/<>^_()]'
+        r'|\\(?:cdot|times|div|pm|mp|leq|geq|neq|in|to|mapsto)'
+    )
+
+    def _should_merge_gap(gap: str) -> bool:
+        stripped = gap.strip()
+        if not stripped or len(stripped) > 80:
+            return False
+        if not _GAP_OPERATOR_RE.search(stripped):
+            return False
+        # Remove LaTeX commands before checking for English words
+        text_only = re.sub(r'\\[a-zA-Z]+', '', stripped)
+        if re.search(r'[A-Za-z]{3,}', text_only):
+            return False
+        return True
+
+    changed = True
+    iters = 0
+    while changed and iters < 30:
+        new = re.sub(
+            r'\$([^$]+)\$(' + _MATH_GAP + r')\$([^$]+)\$',
+            lambda m: '$' + m.group(1) + ' ' + m.group(2).strip() + ' ' + m.group(3) + '$'
+            if _should_merge_gap(m.group(2))
+            else m.group(0),
+            result,
+        )
+        changed = new != result
+        result = new
+        iters += 1
+
     # Also absorb a bare number or single-letter variable adjacent to a $ block.
     # Handles both simple operators (=, +, -) and LaTeX operators (\in, \oplus).
     # e.g. $D_n$ = 2  →  $D_n = 2$
     #      x \in $\mathbb{R}$  →  $x \in \mathbb{R}$
     #      $V = U$ \oplus W  →  $V = U \oplus W$
-    _BARE_ATOM = r'(?:-?\d+(?:\.\d+)?|[A-Za-z])'
+    _BARE_ATOM = r'(?:-?\d+(?:\.\d+)?[A-Za-z]?|[A-Za-z])'
     _ANY_OP = r'(?:[=+\-*/<>]|' + _LATEX_MATH_OPS + r')'
     changed = True
     while changed:
@@ -424,6 +481,33 @@ def _merge_math_blocks(text: str) -> str:
     return result
 
 
+def _safety_wrap_bare_commands(text: str) -> str:
+    """Safety net: wrap any remaining bare LaTeX math commands in $...$
+    to prevent 'Undefined control sequence' and 'Missing $ inserted' errors.
+
+    This is applied only to non-math segments via _apply_to_non_math.
+    """
+    _MATH_ONLY_CMDS = (
+        r'\\(?:cdot|times|div|pm|mp|vdots|ddots|ldots|cdots'
+        r'|leq|geq|neq|in|notin|subset|supset|subseteq|supseteq'
+        r'|to|mapsto|oplus|otimes|cup|cap'
+        r'|Rightarrow|Leftarrow|Leftrightarrow|forall|exists'
+        r'|checkmark|triangle|infty|emptyset|partial|nabla)'
+    )
+    result = re.sub(
+        r'(' + _MATH_ONLY_CMDS + r')(?![a-zA-Z])',
+        r'$\1$',
+        text,
+    )
+    # Wrap bare ^{…} or _{…} that escaped processing
+    result = re.sub(
+        r'((?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9])(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))*)',
+        r'$\1$',
+        result,
+    )
+    return result
+
+
 def _wrap_bare_math(text: str) -> str:
     """Find undelimited math expressions in *text* and wrap them in $...$,
     while leaving already-delimited math untouched.
@@ -437,7 +521,9 @@ def _wrap_bare_math(text: str) -> str:
     text = _apply_to_non_math(text, _pattern_standalone_commands)
     # Step 3: Operator expressions        (n \geq 3, v \neq 0, x \in V, …)
     text = _apply_to_non_math(text, _pattern_operator_expressions)
-    # Step 4: Merge adjacent $…$ blocks   ($D_n$ = $n+1$  →  $D_n = n+1$)
+    # Step 4: Safety net — wrap any remaining bare math commands
+    text = _apply_to_non_math(text, _safety_wrap_bare_commands)
+    # Step 5: Merge adjacent $…$ blocks   ($D_n$ = $n+1$  →  $D_n = n+1$)
     text = _merge_math_blocks(text)
     return text
 
@@ -471,6 +557,43 @@ def text_to_latex(text: str) -> str:
         lambda m: m.group(0).replace('_', r'\_'),
         result,
     )
+
+    # Strip existing inline $…$ delimiters from solver output so that
+    # _wrap_bare_math can handle all math uniformly (prevents mismatched
+    # $ pairs and fragmented expressions like "$D_n$ = $A + Bn$").
+    # Preserve display math (\[…\], $$…$$) and \(…\) from templates.
+    _EARLY_SENTINEL = "\x01"
+
+    # Phase 1: protect display math and \(…\) from stripping
+    _early_store: list[str] = []
+
+    def _early_protect(m: re.Match) -> str:
+        idx = len(_early_store)
+        _early_store.append(m.group(0))
+        return f"{_EARLY_SENTINEL}E{idx}{_EARLY_SENTINEL}"
+
+    result = re.sub(r"\\\[.*?\\\]", _early_protect, result, flags=re.DOTALL)
+    result = re.sub(r"\$\$.*?\$\$", _early_protect, result, flags=re.DOTALL)
+    result = re.sub(r"\\\(.*?\\\)", _early_protect, result, flags=re.DOTALL)
+    result = re.sub(
+        r"\\begin\{((?:v|b|p|V|B)?matrix|smallmatrix|array|"
+        r"align\*?|aligned|equation\*?|gather\*?|gathered|"
+        r"multline\*?|split|flalign\*?|cases)\}.*?\\end\{\1\}",
+        _early_protect,
+        result,
+        flags=re.DOTALL,
+    )
+
+    # Phase 2: strip inline $…$ delimiters (keep content)
+    result = re.sub(r'(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)',
+                    r' \1 ', result, flags=re.DOTALL)
+    # Collapse multiple spaces and fix ^ / _ separated from their argument
+    result = re.sub(r'  +', ' ', result)
+    result = re.sub(r'([_^])\s+(?=\{|[A-Za-z0-9])', r'\1', result)
+
+    # Phase 3: restore display math
+    for idx, frag in enumerate(_early_store):
+        result = result.replace(f"{_EARLY_SENTINEL}E{idx}{_EARLY_SENTINEL}", frag)
 
     result = _wrap_bare_math(result)
     result = _sanitize_non_ascii(result)
