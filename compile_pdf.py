@@ -622,6 +622,11 @@ def _extract_preamble_macros(work_dir: Path) -> str:
     # Walk up from work_dir looking for .tex files with \\newcommand
     for parent in [work_dir, *work_dir.parents]:
         for tex in parent.glob("**/*.tex"):
+            # Skip our own generated output files to prevent a
+            # self-referencing loop (broken macros from a previous run
+            # being re-extracted and re-inserted).
+            if tex.name == "solutions.tex":
+                continue
             try:
                 src = tex.read_text(encoding="utf-8", errors="ignore")
             except OSError:
