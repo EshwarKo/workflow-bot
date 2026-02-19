@@ -50,14 +50,35 @@ _UNICODE_SUPERSCRIPTS = {
     '\u2074': '4', '\u2075': '5', '\u2076': '6',
     '\u2077': '7', '\u2078': '8', '\u2079': '9',
     '\u207a': '+', '\u207b': '-', '\u207f': 'n', '\u2071': 'i',
+    '\u1d48': 'd', '\u1d49': 'e', '\u02b0': 'h',
+    '\u02b2': 'j', '\u1d4f': 'k', '\u02e1': 'l',
+    '\u1d50': 'm', '\u1d52': 'o', '\u1d56': 'p',
+    '\u02b3': 'r', '\u02e2': 's', '\u1d57': 't',
+    '\u1d58': 'u', '\u1d5b': 'v', '\u02b7': 'w',
+    '\u02e3': 'x', '\u1d5d': 'y',  # no standard z
+    '\u1d2c': 'A', '\u1d2e': 'B', '\u1d30': 'D',
+    '\u1d31': 'E', '\u1d33': 'G', '\u1d34': 'H',
+    '\u1d35': 'I', '\u1d36': 'J', '\u1d37': 'K',
+    '\u1d38': 'L', '\u1d39': 'M', '\u1d3a': 'N',
+    '\u1d3c': 'O', '\u1d3e': 'P', '\u1d3f': 'R',
+    '\u1d40': 'T', '\u1d41': 'U', '\u2c7d': 'V',
+    '\u1d42': 'W',
+    '\u1d43': 'a', '\u1d47': 'b', '\u1d9c': 'c',
+    '\u1da0': 'f', '\u1d4d': 'g',
 }
 
 _UNICODE_SUBSCRIPTS = {
     '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3',
     '\u2084': '4', '\u2085': '5', '\u2086': '6',
     '\u2087': '7', '\u2088': '8', '\u2089': '9',
-    '\u2096': 'k', '\u2098': 'm', '\u2099': 'n',
-    '\u1d62': 'i', '\u2c7c': 'j',
+    '\u2090': 'a', '\u2091': 'e', '\u2092': 'o',
+    '\u2093': 'x', '\u2095': 'h', '\u2096': 'k',
+    '\u2097': 'l', '\u2098': 'm', '\u2099': 'n',
+    '\u209a': 'p', '\u209b': 's', '\u209c': 't',
+    '\u1d62': 'i', '\u2c7c': 'j', '\u1d63': 'r',
+    '\u1d64': 'u', '\u1d65': 'v',
+    '\u208a': '+', '\u208b': '-', '\u208c': '=',
+    '\u208d': '(', '\u208e': ')',
 }
 
 _UNICODE_GREEK = {
@@ -99,6 +120,30 @@ _UNICODE_SYMBOLS = {
     '\u221a': '\\sqrt', '\u2202': '\\partial', '\u2207': '\\nabla',
     '\u2026': '\\ldots', '\u22ef': '\\cdots',
     '\u22ee': '\\vdots', '\u22f1': '\\ddots',
+    # Miscellaneous
+    '\u2713': '{\\checkmark}', '\u2714': '{\\checkmark}',  # ✓ ✔
+    '\u2717': '{\\times}', '\u2718': '{\\times}',  # ✗ ✘
+    '\u25b3': '\\triangle', '\u25bd': '\\triangledown',
+    '\u22c6': '\\star', '\u2606': '\\star',
+    '\u2016': '\\|',  # ‖ double vertical line
+    '\u27e8': '\\langle', '\u27e9': '\\rangle',  # ⟨ ⟩
+    '\u2039': '\\langle', '\u203a': '\\rangle',  # ‹ ›
+}
+
+# Unicode box-drawing and bracket characters → LaTeX equivalents
+_UNICODE_MISC = {
+    '\u2502': '|', '\u2503': '|',  # │ ┃
+    '\u250c': '', '\u2510': '', '\u2514': '', '\u2518': '',  # box corners
+    '\u2500': '-', '\u2501': '-',  # ─ ━
+    '\u2523': '|', '\u252b': '|',  # ┣ ┫
+    '\u253c': '+',  # ┼
+    '\u23a1': '[', '\u23a2': '[', '\u23a3': '[',  # ⎡ ⎢ ⎣
+    '\u23a4': ']', '\u23a5': ']', '\u23a6': ']',  # ⎤ ⎥ ⎦
+    '\u23a7': '\\{', '\u23a8': '\\{', '\u23a9': '\\{',  # ⎧ ⎨ ⎩
+    '\u23ab': '\\}', '\u23ac': '\\}', '\u23ad': '\\}',  # ⎫ ⎬ ⎭
+    '\u239b': '(', '\u239c': '(', '\u239d': '(',  # ⎛ ⎜ ⎝
+    '\u239e': ')', '\u239f': ')', '\u23a0': ')',  # ⎞ ⎟ ⎠
+    '\u22c5': '\\cdot', '\u2022': '\\bullet',  # · •
 }
 
 # Characters that signal "this must be in math mode"
@@ -174,7 +219,46 @@ def _unicode_to_latex(text: str) -> str:
     for uchar, cmd in _UNICODE_SYMBOLS.items():
         result = result.replace(uchar, cmd)
 
+    # Replace box-drawing / bracket characters
+    for uchar, repl in _UNICODE_MISC.items():
+        result = result.replace(uchar, repl)
+
     return result
+
+
+def _sanitize_non_ascii(text: str) -> str:
+    """Strip or replace any remaining non-ASCII characters that would cause
+    'Text line contains an invalid character' errors in LaTeX.
+
+    This is a last-resort pass after all known Unicode→LaTeX conversions.
+    It preserves standard ASCII and common safe Latin-1 characters that
+    LaTeX can handle with T1 encoding.
+    """
+    out: list[str] = []
+    for ch in text:
+        cp = ord(ch)
+        if cp < 128:
+            # Standard ASCII — always safe
+            out.append(ch)
+        elif ch in ('\u00e0', '\u00e1', '\u00e2', '\u00e3', '\u00e4',  # àáâãä
+                     '\u00e8', '\u00e9', '\u00ea', '\u00eb',  # èéêë
+                     '\u00ec', '\u00ed', '\u00ee', '\u00ef',  # ìíîï
+                     '\u00f2', '\u00f3', '\u00f4', '\u00f5', '\u00f6',  # òóôõö
+                     '\u00f9', '\u00fa', '\u00fb', '\u00fc',  # ùúûü
+                     '\u00e7', '\u00f1', '\u00df', '\u00ff',  # çñßÿ
+                     '\u00c0', '\u00c1', '\u00c2', '\u00c3', '\u00c4',  # ÀÁÂÃÄ
+                     '\u00c8', '\u00c9', '\u00ca', '\u00cb',  # ÈÉÊË
+                     '\u00cc', '\u00cd', '\u00ce', '\u00cf',  # ÌÍÎÏ
+                     '\u00d2', '\u00d3', '\u00d4', '\u00d5', '\u00d6',  # ÒÓÔÕÖ
+                     '\u00d9', '\u00da', '\u00db', '\u00dc',  # ÙÚÛÜ
+                     '\u00c7', '\u00d1',  # ÇÑ
+                     ):
+            # Common accented characters — T1 encoding handles these
+            out.append(ch)
+        else:
+            # Unknown character — drop it to prevent LaTeX errors
+            pass
+    return ''.join(out)
 
 
 def _split_math_text(text: str) -> list[str]:
@@ -362,6 +446,7 @@ def text_to_latex(text: str) -> str:
     # ── Pre-processing: normalise Unicode math & wrap bare math ──────
     result = _unicode_to_latex(result)
     result = _wrap_bare_math(result)
+    result = _sanitize_non_ascii(result)
 
     math_store: list[str] = []
 
@@ -551,14 +636,27 @@ def _extract_preamble_macros(work_dir: Path) -> str:
             # Pull out \newcommand and \DeclareMathOperator lines
             # Use a pattern that handles one level of nested braces in the body,
             # e.g. \newcommand{\R}{\mathbb{R}} where the body contains inner {}.
+            _BODY = r"\{(?:[^{}]|\{[^}]*\})*\}"  # body with one level of nesting
             cmds = re.findall(
-                r"(\\(?:re)?newcommand\s*\{[^}]+\}(?:\[[^\]]*\])?\{(?:[^{}]|\{[^}]*\})*\})",
+                r"(\\(?:re)?newcommand\s*\{[^}]+\}(?:\[[^\]]*\])?" + _BODY + r")",
                 preamble,
             )
             ops = re.findall(
-                r"(\\DeclareMathOperator\s*\{[^}]+\}\{[^}]*\})",
+                r"(\\DeclareMathOperator\*?\s*\{[^}]+\}" + _BODY + r")",
                 preamble,
             )
+
+            # Filter out non-math formatting macros that shouldn't be
+            # re-defined (e.g. \headrulewidth, \footrulewidth, etc.)
+            _SKIP = {
+                r"\headrulewidth", r"\footrulewidth", r"\arraystretch",
+                r"\baselinestretch", r"\parindent", r"\parskip",
+            }
+            cmds = [
+                c for c in cmds
+                if not any(s in c for s in _SKIP)
+            ]
+
             if cmds or ops:
                 return "\n".join(cmds + ops)
 
