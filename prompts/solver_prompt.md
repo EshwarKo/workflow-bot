@@ -135,6 +135,24 @@ Classify the problem using one or more of these archetypes (this list is not exh
 
 ---
 
+### LaTeX Math Formatting (CRITICAL)
+
+All mathematical content in every text field (`solution`, `hints`, `postmortem`, `action`, `justification`, etc.) **MUST** use proper LaTeX math delimiters:
+
+- **Inline math**: wrap in `$...$` or `\(...\)`. Examples: `$D_n$`, `$\lambda = 1$`, `$n \geq 3$`.
+- **Display math**: wrap in `\[...\]` or `$$...$$`. Use for standalone equations and important formulas.
+- **Environments**: use `\begin{align*}...\end{align*}`, `\begin{pmatrix}...\end{pmatrix}`, etc.
+
+**Do NOT** write bare math outside delimiters. Every variable, equation, subscript, superscript, Greek letter, and math symbol must be inside `$...$` or a display-math environment. For example:
+- WRONG: `Let D_n denote the determinant. Then D_n = 2D_{n-1} - D_{n-2}.`
+- RIGHT: `Let $D_n$ denote the determinant. Then $D_n = 2D_{n-1} - D_{n-2}$.`
+- WRONG: `The eigenvalue λ satisfies λ² = 1.`
+- RIGHT: `The eigenvalue $\lambda$ satisfies $\lambda^2 = 1$.`
+
+**Do NOT** use Unicode math characters (², ₁, λ, ℝ, ≥, ∈, →, ⊕, etc.). Always use LaTeX commands instead (`^{2}`, `_{1}`, `\lambda`, `\mathbb{R}`, `\geq`, `\in`, `\to`, `\oplus`).
+
+---
+
 ### Rules
 
 - NEVER fabricate a theorem or lemma. If you need a result not in the KB, state it explicitly and flag it.

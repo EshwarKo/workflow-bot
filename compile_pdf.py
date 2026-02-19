@@ -43,6 +43,303 @@ _JINJA_ENV = Environment(
 
 _MATH_SENTINEL = "\x00"
 
+# ── Unicode → LaTeX mapping tables ──────────────────────────────────
+
+_UNICODE_SUPERSCRIPTS = {
+    '\u00b0': '0', '\u00b9': '1', '\u00b2': '2', '\u00b3': '3',
+    '\u2074': '4', '\u2075': '5', '\u2076': '6',
+    '\u2077': '7', '\u2078': '8', '\u2079': '9',
+    '\u207a': '+', '\u207b': '-', '\u207f': 'n', '\u2071': 'i',
+}
+
+_UNICODE_SUBSCRIPTS = {
+    '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3',
+    '\u2084': '4', '\u2085': '5', '\u2086': '6',
+    '\u2087': '7', '\u2088': '8', '\u2089': '9',
+    '\u2096': 'k', '\u2098': 'm', '\u2099': 'n',
+    '\u1d62': 'i', '\u2c7c': 'j',
+}
+
+_UNICODE_GREEK = {
+    '\u03b1': '\\alpha', '\u03b2': '\\beta', '\u03b3': '\\gamma',
+    '\u03b4': '\\delta', '\u03b5': '\\varepsilon', '\u03b6': '\\zeta',
+    '\u03b7': '\\eta', '\u03b8': '\\theta', '\u03b9': '\\iota',
+    '\u03ba': '\\kappa', '\u03bb': '\\lambda', '\u03bc': '\\mu',
+    '\u03bd': '\\nu', '\u03be': '\\xi', '\u03c0': '\\pi',
+    '\u03c1': '\\rho', '\u03c3': '\\sigma', '\u03c4': '\\tau',
+    '\u03c5': '\\upsilon', '\u03c6': '\\varphi', '\u03c7': '\\chi',
+    '\u03c8': '\\psi', '\u03c9': '\\omega',
+    '\u0393': '\\Gamma', '\u0394': '\\Delta', '\u0398': '\\Theta',
+    '\u039b': '\\Lambda', '\u039e': '\\Xi', '\u03a0': '\\Pi',
+    '\u03a3': '\\Sigma', '\u03a6': '\\Phi', '\u03a8': '\\Psi',
+    '\u03a9': '\\Omega',
+}
+
+_UNICODE_SYMBOLS = {
+    '\u211d': '\\mathbb{R}', '\u2102': '\\mathbb{C}',
+    '\u2115': '\\mathbb{N}', '\u2124': '\\mathbb{Z}',
+    '\u211a': '\\mathbb{Q}',
+    '\u2208': '\\in', '\u2209': '\\notin',
+    '\u2282': '\\subset', '\u2283': '\\supset',
+    '\u2286': '\\subseteq', '\u2287': '\\supseteq',
+    '\u222a': '\\cup', '\u2229': '\\cap',
+    '\u2295': '\\oplus', '\u2297': '\\otimes',
+    '\u22a5': '\\perp', '\u221e': '\\infty', '\u2205': '\\emptyset',
+    '\u2264': '\\leq', '\u2265': '\\geq',
+    '\u2260': '\\neq', '\u2261': '\\equiv',
+    '\u2248': '\\approx', '\u223c': '\\sim', '\u2245': '\\cong',
+    '\u2192': '\\to', '\u2190': '\\leftarrow', '\u21a6': '\\mapsto',
+    '\u21d2': '\\Rightarrow', '\u21d0': '\\Leftarrow',
+    '\u21d4': '\\Leftrightarrow',
+    '\u2200': '\\forall', '\u2203': '\\exists',
+    '\u00b7': '\\cdot', '\u22c5': '\\cdot',
+    '\u00d7': '\\times', '\u00f7': '\\div',
+    '\u00b1': '\\pm', '\u2213': '\\mp',
+    '\u220f': '\\prod', '\u2211': '\\sum', '\u222b': '\\int',
+    '\u221a': '\\sqrt', '\u2202': '\\partial', '\u2207': '\\nabla',
+    '\u2026': '\\ldots', '\u22ef': '\\cdots',
+    '\u22ee': '\\vdots', '\u22f1': '\\ddots',
+}
+
+# Characters that signal "this must be in math mode"
+_MATH_TRIGGER_RE = re.compile(
+    r'[_^]'
+    r'|\\(?:alpha|beta|gamma|delta|varepsilon|epsilon|zeta|eta|theta'
+    r'|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|varphi|phi'
+    r'|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega'
+    r'|leq|geq|neq|in|notin|subset|supset|subseteq|supseteq'
+    r'|cup|cap|oplus|otimes|to|mapsto|cdot|times|div|pm|mp'
+    r'|infty|emptyset|partial|nabla|ldots|cdots'
+    r'|mathbb|mathcal|mathfrak|operatorname'
+    r'|Rightarrow|Leftarrow|Leftrightarrow|forall|exists)\b'
+)
+
+# LaTeX commands that are math-operator/relation (used for Pattern 2b)
+_LATEX_MATH_OPS = (
+    r'\\(?:leq|geq|neq|in|notin|subset|supset|subseteq|supseteq'
+    r'|to|mapsto|equiv|approx|sim|cong|cdot|times|div|pm|mp'
+    r'|oplus|otimes|cup|cap'
+    r'|Rightarrow|Leftarrow|Leftrightarrow)'
+)
+
+# A "math token": variable or command with optional subscripts/superscripts
+_MATH_TOKEN = (
+    r'(?:\d*(?:[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?)'
+    r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
+    r'(?:\([^)]*\))?)'
+)
+
+# Number token (possibly negative, with optional decimal)
+_NUM_TOKEN = r'(?:-?\d+(?:\.\d+)?)'
+
+
+def _has_math_trigger(s: str) -> bool:
+    """Return True if string contains something that must be in math mode."""
+    return bool(_MATH_TRIGGER_RE.search(s))
+
+
+def _unicode_to_latex(text: str) -> str:
+    """Convert Unicode math characters to their LaTeX command equivalents.
+
+    This is a pre-processing step: it turns Unicode Greek letters, sub/super-
+    scripts, double-struck letters, and math symbols into LaTeX notation so
+    that downstream wrapping can detect them as math content.
+    """
+    result = text
+
+    # Replace runs of Unicode superscript characters → ^{...}
+    sup_chars_re = '[' + ''.join(re.escape(c) for c in _UNICODE_SUPERSCRIPTS) + ']+'
+    def _sup_repl(m: re.Match) -> str:
+        return '^{' + ''.join(_UNICODE_SUPERSCRIPTS.get(c, c) for c in m.group(0)) + '}'
+    result = re.sub(sup_chars_re, _sup_repl, result)
+
+    # Replace runs of Unicode subscript characters → _{...}
+    sub_chars_re = '[' + ''.join(re.escape(c) for c in _UNICODE_SUBSCRIPTS) + ']+'
+    def _sub_repl(m: re.Match) -> str:
+        return '_{' + ''.join(_UNICODE_SUBSCRIPTS.get(c, c) for c in m.group(0)) + '}'
+    result = re.sub(sub_chars_re, _sub_repl, result)
+
+    # Replace Greek letters; add space after only if followed by an ASCII letter
+    # (to prevent \alphax being parsed as one command)
+    for uchar, cmd in _UNICODE_GREEK.items():
+        # re.sub replacement must escape backslashes
+        result = re.sub(
+            re.escape(uchar) + r'(?=[A-Za-z])',
+            cmd.replace('\\', '\\\\') + ' ',
+            result,
+        )
+        result = result.replace(uchar, cmd)
+
+    # Replace double-struck and other symbol characters
+    for uchar, cmd in _UNICODE_SYMBOLS.items():
+        result = result.replace(uchar, cmd)
+
+    return result
+
+
+def _split_math_text(text: str) -> list[str]:
+    """Split *text* into alternating [non-math, math, non-math, …] segments.
+
+    Math segments (odd indices) are already-delimited: $…$, $$…$$,
+    \\(…\\), \\[…\\], or LaTeX environments.
+    """
+    return re.split(
+        r'(\$\$.*?\$\$'
+        r'|\$(?!\$).*?(?<!\$)\$'
+        r'|\\\(.*?\\\)'
+        r'|\\\[.*?\\\]'
+        r'|\\begin\{(?:v|b|p|V|B)?matrix\}.*?\\end\{(?:v|b|p|V|B)?matrix\}'
+        r'|\\begin\{(?:align\*?|equation\*?|gather\*?|cases)\}'
+        r'.*?\\end\{(?:align\*?|equation\*?|gather\*?|cases)\})',
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def _apply_to_non_math(text: str, fn) -> str:
+    """Split by $…$ (and other math delimiters), apply *fn* only to the
+    non-math segments, and reassemble."""
+    parts = _split_math_text(text)
+    return ''.join(
+        part if i % 2 == 1 else fn(part)
+        for i, part in enumerate(parts)
+    )
+
+
+def _pattern_subscript_superscript(text: str) -> str:
+    """Pattern 1: wrap variables/commands that have subscripts or superscripts.
+
+    Matches D_n, D_{n-1}, C_{11}, x^2, A^T, 2D_{n-1}, \\chi_J, etc.
+    Does NOT match bare commands like \\geq or \\lambda (no script) —
+    those are handled by Pattern 2 or 3.
+    """
+    # Require at least one subscript/superscript (note the + not *)
+    _TOKEN_WITH_SCRIPT = (
+        r'(?:\d*(?:[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?)'
+        r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))+'
+        r'(?:\([^)]*\))?)'
+    )
+    return re.sub(
+        r'(' + _TOKEN_WITH_SCRIPT + r')',
+        r'$\1$',
+        text,
+    )
+
+
+def _pattern_standalone_commands(text: str) -> str:
+    """Pattern 2: wrap standalone math 'nouns' (Greek letters, blackboard bold).
+
+    Does NOT include relational/binary operators (\\leq, \\in, etc.) — those
+    are handled by Pattern 3 together with their operands.
+    """
+    _STANDALONE = (
+        r'alpha|beta|gamma|delta|varepsilon|epsilon|zeta|eta|theta'
+        r'|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|varphi|phi'
+        r'|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Phi|Psi|Omega'
+        r'|infty|emptyset|partial|nabla'
+        r'|mathbb\{[^}]*\}|mathcal\{[^}]*\}|mathfrak\{[^}]*\}'
+    )
+    return re.sub(
+        r'(\\(?:' + _STANDALONE + r')'
+        r'(?:[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
+        r')'
+        r'(?![a-zA-Z])',
+        r'$\1$',
+        text,
+    )
+
+
+def _pattern_operator_expressions(text: str) -> str:
+    """Pattern 3: wrap ``token OP token`` where OP is a math operator.
+
+    Catches: n \\geq 3, v \\neq 0, x \\in V, A \\oplus B, n = 1, etc.
+    """
+    _GENERAL_TOKEN = r'(?:' + _NUM_TOKEN + r'|' + _MATH_TOKEN + r')'
+    _ALL_OPS = r'(?:[=<>]|' + _LATEX_MATH_OPS + r')'
+
+    def _wrap_op_expr(m: re.Match) -> str:
+        left, op, right = m.group(1), m.group(2), m.group(3)
+        # Always wrap if operator is a LaTeX command (\leq, \in, etc.)
+        if op.startswith('\\'):
+            return f'${left} {op} {right}$'
+        # Wrap if either side has a math trigger
+        if _has_math_trigger(left) or _has_math_trigger(right):
+            return f'${left} {op} {right}$'
+        # Wrap if one side is a single letter and other is a number or single letter
+        ls, rs = left.strip(), right.strip()
+        if (len(ls) == 1 and ls.isalpha()
+                and (rs.lstrip('-').replace('.', '').isdigit()
+                     or (len(rs) <= 2 and rs[0].isalpha()))):
+            return f'${left} {op} {right}$'
+        return m.group(0)
+
+    return re.sub(
+        r'(' + _GENERAL_TOKEN + r')'
+        r'\s*(' + _ALL_OPS + r')\s*'
+        r'(' + _GENERAL_TOKEN + r')',
+        _wrap_op_expr,
+        text,
+    )
+
+
+def _merge_math_blocks(text: str) -> str:
+    """Merge adjacent $…$ blocks connected by operators or bare numbers/vars."""
+    result = text
+    _MERGE_OPS = r'(?:[=+\-*/,<>]|' + _LATEX_MATH_OPS + r')'
+
+    # Merge  $A$ op $B$  →  $A op B$
+    changed = True
+    while changed:
+        new = re.sub(
+            r'\$([^$]+)\$\s*(' + _MERGE_OPS + r')\s*\$([^$]+)\$',
+            r'$\1 \2 \3$',
+            result,
+        )
+        changed = new != result
+        result = new
+
+    # Also absorb a bare number or single-letter variable adjacent to a $ block.
+    # Handles both simple operators (=, +, -) and LaTeX operators (\in, \oplus).
+    # e.g. $D_n$ = 2  →  $D_n = 2$
+    #      x \in $\mathbb{R}$  →  $x \in \mathbb{R}$
+    #      $V = U$ \oplus W  →  $V = U \oplus W$
+    _BARE_ATOM = r'(?:-?\d+(?:\.\d+)?|[A-Za-z])'
+    _ANY_OP = r'(?:[=+\-*/<>]|' + _LATEX_MATH_OPS + r')'
+    changed = True
+    while changed:
+        new = re.sub(
+            r'\$([^$]+)\$\s*(' + _ANY_OP + r')\s*(' + _BARE_ATOM + r')(?![A-Za-z_^$\\])',
+            r'$\1 \2 \3$',
+            result,
+        )
+        new = re.sub(
+            r'(?<![A-Za-z_^$\\])(' + _BARE_ATOM + r')\s*(' + _ANY_OP + r')\s*\$([^$]+)\$',
+            r'$\1 \2 \3$',
+            new,
+        )
+        changed = new != result
+        result = new
+
+    return result
+
+
+def _wrap_bare_math(text: str) -> str:
+    """Find undelimited math expressions in *text* and wrap them in $...$,
+    while leaving already-delimited math untouched.
+
+    Each pattern step re-splits the text so that earlier $…$ insertions
+    are respected by later patterns.
+    """
+    # Step 1: Subscripts & superscripts  (D_n, x^2, \chi_{1}(\lambda), …)
+    text = _apply_to_non_math(text, _pattern_subscript_superscript)
+    # Step 2: Standalone math nouns       (\lambda, \mathbb{R}, \infty, …)
+    text = _apply_to_non_math(text, _pattern_standalone_commands)
+    # Step 3: Operator expressions        (n \geq 3, v \neq 0, x \in V, …)
+    text = _apply_to_non_math(text, _pattern_operator_expressions)
+    # Step 4: Merge adjacent $…$ blocks   ($D_n$ = $n+1$  →  $D_n = n+1$)
+    text = _merge_math_blocks(text)
+    return text
+
 
 def text_to_latex(text: str) -> str:
     """Convert solver output (English prose with embedded LaTeX math and
@@ -61,6 +358,11 @@ def text_to_latex(text: str) -> str:
         return ""
 
     result = text
+
+    # ── Pre-processing: normalise Unicode math & wrap bare math ──────
+    result = _unicode_to_latex(result)
+    result = _wrap_bare_math(result)
+
     math_store: list[str] = []
 
     def _protect(m: re.Match) -> str:
@@ -247,8 +549,10 @@ def _extract_preamble_macros(work_dir: Path) -> str:
             preamble = src[:doc_start]
 
             # Pull out \newcommand and \DeclareMathOperator lines
+            # Use a pattern that handles one level of nested braces in the body,
+            # e.g. \newcommand{\R}{\mathbb{R}} where the body contains inner {}.
             cmds = re.findall(
-                r"(\\(?:re)?newcommand\s*\{[^}]+\}(?:\[[^\]]*\])?\{[^}]*\})",
+                r"(\\(?:re)?newcommand\s*\{[^}]+\}(?:\[[^\]]*\])?\{(?:[^{}]|\{[^}]*\})*\})",
                 preamble,
             )
             ops = re.findall(
