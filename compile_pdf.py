@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Solution PDF Compiler
-=====================
+Solution PDF Compiler (LaTeX)
+=============================
 
 Reads solution_N.json, verification_N.json, and problem_N.json files from a
-MathPipe solutions directory and compiles them into a properly formatted PDF.
+MathPipe solutions directory, generates a beautifully formatted LaTeX document,
+and compiles it to PDF via pdflatex.
 
 Usage:
     python compile_pdf.py solutions/linalg_ii_ht2026/sheet_5356765
@@ -13,189 +14,136 @@ Usage:
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Template
-from weasyprint import HTML
+from jinja2 import Environment
 
 
-# ── Path to the MathJax Node.js renderer ─────────────────────────────
+# ── Jinja2 environment with LaTeX-safe delimiters ────────────────────
 
-_MATH_RENDERER = Path(__file__).parent / "math_to_svg.js"
-
-
-# ── LaTeX → SVG conversion (batched via MathJax) ─────────────────────
-
-
-class MathRenderer:
-    """Collects LaTeX fragments, batch-renders them to SVG via MathJax,
-    and provides placeholder-based substitution."""
-
-    def __init__(self) -> None:
-        self._fragments: list[dict[str, Any]] = []
-        self._svg_cache: dict[str, str] = {}
-        self._rendered = False
-
-    def _placeholder(self, frag_id: str) -> str:
-        return f"__MATH_{frag_id}__"
-
-    def add(self, latex: str, display: bool = False) -> str:
-        """Register a LaTeX fragment and return a placeholder string."""
-        frag_id = str(len(self._fragments))
-        self._fragments.append({
-            "id": frag_id,
-            "latex": latex,
-            "display": display,
-        })
-        return self._placeholder(frag_id)
-
-    def render_all(self) -> None:
-        """Batch-render all collected fragments to SVG via Node.js + MathJax."""
-        if not self._fragments or self._rendered:
-            return
-
-        payload = json.dumps(self._fragments)
-        try:
-            result = subprocess.run(
-                ["node", str(_MATH_RENDERER)],
-                input=payload,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if result.returncode != 0:
-                print(f"MathJax warning: {result.stderr.strip()}", file=sys.stderr)
-            self._svg_cache = json.loads(result.stdout) if result.stdout else {}
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"MathJax renderer failed: {e}", file=sys.stderr)
-            self._svg_cache = {}
-
-        self._rendered = True
-
-    def substitute(self, html_text: str) -> str:
-        """Replace all placeholders with their rendered SVGs."""
-        for frag in self._fragments:
-            frag_id = frag["id"]
-            placeholder = self._placeholder(frag_id)
-            svg = self._svg_cache.get(frag_id, "")
-            if not svg:
-                # Fallback: render as styled code
-                escaped = (frag["latex"]
-                           .replace("&", "&amp;")
-                           .replace("<", "&lt;")
-                           .replace(">", "&gt;"))
-                tag = "div" if frag["display"] else "span"
-                svg = f'<{tag} class="math-fallback">{escaped}</{tag}>'
-            elif frag["display"]:
-                svg = f'<div class="math-display">{svg}</div>'
-            else:
-                svg = f'<span class="math-inline">{svg}</span>'
-            html_text = html_text.replace(placeholder, svg)
-        return html_text
+_JINJA_ENV = Environment(
+    block_start_string="<%",
+    block_end_string="%>",
+    variable_start_string="<<",
+    variable_end_string=">>",
+    comment_start_string="<#",
+    comment_end_string="#>",
+    autoescape=False,
+)
 
 
-# Module-level renderer instance, reset per compile run
-_renderer: MathRenderer | None = None
+# ── Text processing: Markdown+LaTeX mix → clean LaTeX ────────────────
+
+_MATH_SENTINEL = "\x00"
 
 
-def _get_renderer() -> MathRenderer:
-    global _renderer
-    if _renderer is None:
-        _renderer = MathRenderer()
-    return _renderer
+def text_to_latex(text: str) -> str:
+    """Convert solver output (English prose with embedded LaTeX math and
+    optional Markdown formatting) into clean LaTeX source.
 
+    The solver writes a mix of:
+      • Plain English text
+      • LaTeX math ($...$, \\[...\\], \\(...\\), $$...$$, environments)
+      • Markdown formatting (**bold**, *italic*, ``- list``, ``### heading``)
+      • LaTeX commands (\\textbf{}, \\emph{}, \\quad, etc.)
 
-def latex_to_html(text: str) -> str:
-    """Convert a string containing LaTeX math delimiters to HTML with SVG math.
-
-    Handles:
-      - \\[ ... \\]  and  $$ ... $$   (display math)
-      - \\( ... \\)  and  $ ... $     (inline math)
-      - \\begin{...} ... \\end{...}   (environments used as display math)
-      - LaTeX formatting: \\textbf, \\emph, \\\\, \\quad, etc.
-      - Markdown-style bold, italic, headers, and lists
+    This function protects all math content, escapes problematic characters
+    in the non-math text, converts Markdown → LaTeX, and restores the math.
     """
     if not text:
         return ""
 
-    renderer = _get_renderer()
     result = text
+    math_store: list[str] = []
 
-    # Step 1: Display math  \[ ... \]
-    def _replace_display_bracket(m: re.Match) -> str:
-        return renderer.add(m.group(1).strip(), display=True)
+    def _protect(m: re.Match) -> str:
+        idx = len(math_store)
+        math_store.append(m.group(0))
+        return f"{_MATH_SENTINEL}M{idx}{_MATH_SENTINEL}"
 
-    result = re.sub(r"\\\[(.*?)\\\]", _replace_display_bracket, result, flags=re.DOTALL)
+    # ── Protect delimited math (order matters — explicit delimiters first) ──
 
-    # Step 2: Display math  $$ ... $$
-    def _replace_display_dollar(m: re.Match) -> str:
-        return renderer.add(m.group(1).strip(), display=True)
-
-    result = re.sub(r"\$\$(.*?)\$\$", _replace_display_dollar, result, flags=re.DOTALL)
-
-    # Step 3: Standalone display-math environments not yet wrapped
-    def _replace_env_display(m: re.Match) -> str:
-        return renderer.add(m.group(0).strip(), display=True)
-
+    # Display  \[ ... \]
+    result = re.sub(r"\\\[.*?\\\]", _protect, result, flags=re.DOTALL)
+    # Display  $$ ... $$
+    result = re.sub(r"\$\$.*?\$\$", _protect, result, flags=re.DOTALL)
+    # Inline  \( ... \)
+    result = re.sub(r"\\\(.*?\\\)", _protect, result, flags=re.DOTALL)
+    # Inline  $ ... $  (but not $$)
     result = re.sub(
-        r"\\begin\{(vmatrix|bmatrix|pmatrix|Vmatrix|Bmatrix|matrix|align\*?|"
-        r"equation\*?|gather\*?|cases)\}.*?\\end\{\1\}",
-        _replace_env_display,
+        r"(?<!\$)\$(?!\$).*?(?<!\$)\$(?!\$)", _protect, result, flags=re.DOTALL
+    )
+    # Bare display environments (only those NOT already inside a delimiter)
+    result = re.sub(
+        r"\\begin\{((?:v|b|p|V|B)?matrix|smallmatrix|array|"
+        r"align\*?|aligned|equation\*?|gather\*?|gathered|"
+        r"multline\*?|split|flalign\*?|cases)\}.*?\\end\{\1\}",
+        _protect,
         result,
         flags=re.DOTALL,
     )
 
-    # Step 4: Inline math  \( ... \)
-    def _replace_inline_paren(m: re.Match) -> str:
-        return renderer.add(m.group(1).strip(), display=False)
+    # ── Escape characters that are problematic in LaTeX text mode ──
+    result = result.replace("%", r"\%")
+    result = result.replace("#", r"\#")
+    # & outside of math or tabular — escape only bare &
+    result = re.sub(r"(?<!\\)&", r"\\&", result)
 
-    result = re.sub(r"\\\((.*?)\\\)", _replace_inline_paren, result, flags=re.DOTALL)
+    # ── Convert Markdown formatting to LaTeX equivalents ──
+    result = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", result)
+    result = re.sub(
+        r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\\textit{\1}", result
+    )
 
-    # Step 5: Inline math  $ ... $  (but not $$)
-    def _replace_inline_dollar(m: re.Match) -> str:
-        return renderer.add(m.group(1).strip(), display=False)
+    # Markdown headers → LaTeX sections
+    result = re.sub(
+        r"(?:^|\n)###\s+(.+)", r"\n\\subsubsection*{\1}", result
+    )
+    result = re.sub(r"(?:^|\n)##\s+(.+)", r"\n\\subsection*{\1}", result)
 
-    result = re.sub(r"(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)", _replace_inline_dollar, result, flags=re.DOTALL)
-
-    # Step 6: LaTeX formatting commands (outside math)
-    result = re.sub(r"\\textbf\{(.*?)\}", r"<strong>\1</strong>", result)
-    result = re.sub(r"\\emph\{(.*?)\}", r"<em>\1</em>", result)
-    result = re.sub(r"\\textit\{(.*?)\}", r"<em>\1</em>", result)
-    result = re.sub(r"\\text\{(.*?)\}", r"\1", result)
-
-    # Step 7: Markdown-style bold and italic
-    result = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", result)
-    result = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", result)
-
-    # Step 8: Markdown-style headers
-    result = re.sub(r"(?:^|\n)#{3,}\s+(.+?)(?:\n|$)", r"<h4>\1</h4>", result)
-
-    # Line breaks (only outside math — placeholders are safe)
-    result = result.replace("\\\\", "<br>")
-    result = result.replace("\\newline", "<br>")
-
-    # Spacing
-    result = result.replace("\\quad", "&emsp;")
-    result = result.replace("\\qquad", "&emsp;&emsp;")
-    result = result.replace("\\,", "&thinsp;")
-
-    # Markdown-style bullet lists
-    def _replace_md_list(m: re.Match) -> str:
+    # Markdown bullet lists → itemize
+    def _replace_list(m: re.Match) -> str:
         items = re.findall(r"^- (.+)$", m.group(0), re.MULTILINE)
-        li = "".join(f"<li>{item}</li>" for item in items)
-        return f"<ul>{li}</ul>"
+        if not items:
+            return m.group(0)
+        inner = "\n".join(f"  \\item {it}" for it in items)
+        return f"\n\\begin{{itemize}}[nosep]\n{inner}\n\\end{{itemize}}"
 
-    result = re.sub(r"(?:^|\n)(- .+(?:\n- .+)*)", _replace_md_list, result)
+    result = re.sub(r"(?:^|\n)(- .+(?:\n- .+)*)", _replace_list, result)
 
-    # Paragraph breaks and newlines
-    result = re.sub(r"\n{2,}", "</p><p>", result)
-    result = result.replace("\n", " ")
+    # Collapse excessive blank lines
+    result = re.sub(r"\n{3,}", "\n\n", result)
 
-    return result
+    # ── Restore protected math content ──
+    for idx, frag in enumerate(math_store):
+        result = result.replace(f"{_MATH_SENTINEL}M{idx}{_MATH_SENTINEL}", frag)
+
+    return result.strip()
+
+
+def _escape_tex(text: str) -> str:
+    """Escape a plain-text string for safe inclusion in LaTeX (no math)."""
+    for old, new in [
+        ("\\", r"\textbackslash{}"),
+        ("{", r"\{"),
+        ("}", r"\}"),
+        ("$", r"\$"),
+        ("%", r"\%"),
+        ("#", r"\#"),
+        ("&", r"\&"),
+        ("_", r"\_"),
+        ("~", r"\textasciitilde{}"),
+        ("^", r"\textasciicircum{}"),
+    ]:
+        text = text.replace(old, new)
+    return text
 
 
 # ── Data loading ─────────────────────────────────────────────────────
@@ -215,14 +163,12 @@ def load_solutions_dir(work_dir: Path) -> list[dict[str, Any]]:
     """Load all problem/solution/verification triples from a solutions dir."""
     problems = []
 
-    # Find all solution files and sort by problem number
     solution_files = sorted(work_dir.glob("solution_*.json"))
     if not solution_files:
         print(f"No solution files found in {work_dir}")
         return []
 
     for sf in solution_files:
-        # Extract problem number from filename
         match = re.search(r"solution_(\d+)\.json", sf.name)
         if not match:
             continue
@@ -246,562 +192,461 @@ def load_solutions_dir(work_dir: Path) -> list[dict[str, Any]]:
     return problems
 
 
-# ── Verification badge ───────────────────────────────────────────────
+# ── Verification helpers ─────────────────────────────────────────────
 
 
 def verification_badge(verification: dict[str, Any] | None) -> dict[str, str]:
-    """Return badge class and label for a verification status."""
+    """Return a badge colour name and label for the verification status."""
     if not verification:
-        return {"cls": "badge-skip", "label": "Not verified"}
+        return {"colour": "gray", "label": "Not verified"}
 
     overall = verification.get("overall", {})
     status = overall.get("status", "unknown")
     confidence = overall.get("confidence", 0)
+    pct = f"{confidence * 100:.0f}\\%"
 
     if status == "verified":
-        return {"cls": "badge-pass", "label": f"Verified ({confidence:.0%})"}
+        return {"colour": "passgreen", "label": f"Verified ({pct})"}
     elif status == "flagged":
-        return {"cls": "badge-warn", "label": f"Flagged ({confidence:.0%})"}
+        return {"colour": "warnamber", "label": f"Flagged ({pct})"}
     elif status == "rejected":
-        return {"cls": "badge-fail", "label": f"Rejected ({confidence:.0%})"}
+        return {"colour": "failred", "label": f"Rejected ({pct})"}
     else:
-        return {"cls": "badge-skip", "label": status.title()}
+        return {"colour": "gray", "label": status.title()}
 
 
-# ── HTML template ────────────────────────────────────────────────────
+def _check_colour(status: str) -> str:
+    """Map a verification check status to a LaTeX colour name."""
+    return {
+        "PASS": "passgreen",
+        "WARN": "warnamber",
+        "FLAG": "warnamber",
+    }.get(status, "failred")
 
-HTML_TEMPLATE = Template(r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>{{ title }}</title>
-<style>
-  @page {
-    size: A4;
-    margin: 2cm 2.2cm;
-    @bottom-center {
-      content: "Page " counter(page) " of " counter(pages);
-      font-size: 9pt;
-      color: #888;
-    }
-  }
 
-  :root {
-    --accent: #1a3a5c;
-    --accent-light: #e8f0f8;
-    --border: #c0c8d0;
-    --text: #1a1a1a;
-    --text-light: #555;
-    --green: #1a7a3a;
-    --green-bg: #e6f5ec;
-    --amber: #8a6d00;
-    --amber-bg: #fff8e1;
-    --red: #a82020;
-    --red-bg: #fde8e8;
-    --grey-bg: #f5f5f5;
-  }
+# ── Preamble extraction (custom macros from course LaTeX source) ─────
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: "Latin Modern Roman", "Computer Modern", "Times New Roman", Georgia, serif;
-    font-size: 11pt;
-    line-height: 1.55;
-    color: var(--text);
-  }
+def _extract_preamble_macros(work_dir: Path) -> str:
+    """Try to find the course's .tex source and extract \\newcommand defs.
 
-  /* ── Title page ─────────────────────────── */
-  .title-page {
-    page-break-after: always;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 80vh;
-    text-align: center;
-  }
-  .title-page h1 {
-    font-size: 24pt;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 0.3em;
-    letter-spacing: 0.02em;
-  }
-  .title-page .subtitle {
-    font-size: 14pt;
-    color: var(--text-light);
-    margin-bottom: 2em;
-  }
-  .title-page .meta {
-    font-size: 10pt;
-    color: #888;
-  }
-  .title-page .rule {
-    width: 60%;
-    height: 2px;
-    background: var(--accent);
-    margin: 1.5em auto;
-  }
-  .title-page .summary-table {
-    margin-top: 1.5em;
-    border-collapse: collapse;
-    font-size: 10pt;
-  }
-  .summary-table td, .summary-table th {
-    padding: 0.35em 1em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  .summary-table th {
-    font-weight: 600;
-    color: var(--accent);
-  }
+    Returns a string of LaTeX \\newcommand lines (empty if none found).
+    """
+    # Walk up from work_dir looking for .tex files with \\newcommand
+    for parent in [work_dir, *work_dir.parents]:
+        for tex in parent.glob("**/*.tex"):
+            try:
+                src = tex.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
 
-  /* ── Problems ───────────────────────────── */
-  .problem {
-    page-break-before: always;
-  }
-  .problem:first-of-type {
-    page-break-before: auto;
-  }
+            # Extract everything before \begin{document}
+            doc_start = src.find(r"\begin{document}")
+            if doc_start < 0:
+                continue
+            preamble = src[:doc_start]
 
-  .problem-header {
-    background: var(--accent);
-    color: white;
-    padding: 0.5em 0.8em;
-    font-size: 14pt;
-    font-weight: 700;
-    margin-bottom: 0;
-    border-radius: 4px 4px 0 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+            # Pull out \newcommand and \DeclareMathOperator lines
+            cmds = re.findall(
+                r"(\\(?:re)?newcommand\s*\{[^}]+\}(?:\[[^\]]*\])?\{[^}]*\})",
+                preamble,
+            )
+            ops = re.findall(
+                r"(\\DeclareMathOperator\s*\{[^}]+\}\{[^}]*\})",
+                preamble,
+            )
+            if cmds or ops:
+                return "\n".join(cmds + ops)
 
-  .badge {
-    font-size: 8.5pt;
-    font-weight: 600;
-    padding: 0.2em 0.6em;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .badge-pass { background: var(--green-bg); color: var(--green); }
-  .badge-warn { background: var(--amber-bg); color: var(--amber); }
-  .badge-fail { background: var(--red-bg); color: var(--red); }
-  .badge-skip { background: var(--grey-bg); color: #888; }
+        # Stop at the repo root
+        if (parent / ".git").exists():
+            break
 
-  .problem-statement {
-    background: var(--accent-light);
-    border: 1px solid var(--border);
-    border-top: none;
-    padding: 0.8em 1em;
-    margin-bottom: 1.2em;
-    border-radius: 0 0 4px 4px;
-    font-style: italic;
-  }
+    return ""
 
-  /* ── Sections within a problem ──────────── */
-  h3 {
-    font-size: 12pt;
-    font-weight: 700;
-    color: var(--accent);
-    border-bottom: 1.5px solid var(--accent);
-    padding-bottom: 0.15em;
-    margin: 1.2em 0 0.5em 0;
-  }
 
-  h4 {
-    font-size: 11pt;
-    font-weight: 600;
-    color: var(--text);
-    margin: 0.9em 0 0.3em 0;
-  }
+# ── LaTeX template ───────────────────────────────────────────────────
 
-  p { margin: 0.4em 0; }
+LATEX_TEMPLATE = _JINJA_ENV.from_string(r"""\documentclass[11pt, a4paper]{article}
 
-  /* ── Solution steps ─────────────────────── */
-  .step {
-    margin: 0.5em 0;
-    padding: 0.5em 0.7em;
-    border-left: 3px solid var(--accent);
-    background: #fafcfe;
-  }
-  .step-num {
-    font-weight: 700;
-    color: var(--accent);
-    margin-right: 0.3em;
-  }
-  .step .justification {
-    font-size: 10pt;
-    color: var(--text-light);
-    margin-top: 0.15em;
-  }
-  .step .kb-refs {
-    font-size: 9pt;
-    color: #888;
-    margin-top: 0.1em;
-  }
+% ── Encoding & fonts ────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
 
-  /* ── Hints tiers ────────────────────────── */
-  .hint-tier {
-    margin: 0.5em 0;
-    padding: 0.5em 0.8em;
-    border-radius: 4px;
-  }
-  .tier1 { background: #f0faf0; border-left: 3px solid var(--green); }
-  .tier2 { background: var(--amber-bg); border-left: 3px solid var(--amber); }
-  .tier3 { background: var(--accent-light); border-left: 3px solid var(--accent); }
-  .hint-label {
-    font-size: 9pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.2em;
-  }
-  .tier1 .hint-label { color: var(--green); }
-  .tier2 .hint-label { color: var(--amber); }
-  .tier3 .hint-label { color: var(--accent); }
+% ── Mathematics ─────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm, amsfonts, mathtools}
 
-  /* ── Postmortem ─────────────────────────── */
-  .postmortem {
-    background: var(--grey-bg);
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 0.8em 1em;
-    margin-top: 1em;
-  }
-  .postmortem h3 { border-bottom-color: #999; color: #444; }
+% ── Layout ──────────────────────────────────────────────
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[shortlabels]{enumitem}
+\usepackage{parskip}
 
-  .insight-box {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 0.6em 0.8em;
-    margin: 0.4em 0;
-  }
-  .insight-box .label {
-    font-size: 9pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--accent);
-    margin-bottom: 0.15em;
-  }
+% ── Colours & boxes ─────────────────────────────────────
+\usepackage[dvipsnames]{xcolor}
+\usepackage[breakable, skins]{tcolorbox}
+\usepackage{hyperref}
 
-  /* ── Verification detail ────────────────── */
-  .verification-detail {
-    font-size: 10pt;
-    margin-top: 0.8em;
-    padding: 0.6em 0.8em;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: white;
-  }
-  .verification-detail .check-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.2em 0;
-    border-bottom: 1px solid #eee;
-  }
-  .check-row:last-child { border-bottom: none; }
-  .check-pass { color: var(--green); }
-  .check-warn { color: var(--amber); }
-  .check-fail { color: var(--red); }
+\definecolor{accent}{HTML}{1a3a5c}
+\definecolor{accentlight}{HTML}{e8f0f8}
+\definecolor{passgreen}{HTML}{1a7a3a}
+\definecolor{passgreenlight}{HTML}{e6f5ec}
+\definecolor{warnamber}{HTML}{8a6d00}
+\definecolor{warnamberlight}{HTML}{fff8e1}
+\definecolor{failred}{HTML}{a82020}
+\definecolor{failredlight}{HTML}{fde8e8}
+\definecolor{lightgrey}{HTML}{f5f5f5}
+\definecolor{graylight}{HTML}{f0f0f0}
 
-  /* ── Lists ──────────────────────────────── */
-  ul, ol { margin: 0.3em 0 0.3em 1.5em; }
-  li { margin: 0.15em 0; }
+% ── tcolorbox styles ───────────────────────────────────
+\newtcolorbox{problembox}{
+  colback=accentlight, colframe=accent,
+  fontupper=\itshape, breakable,
+  left=6pt, right=6pt, top=6pt, bottom=6pt,
+  boxrule=0.6pt,
+}
 
-  /* ── Math (SVG via MathJax) ──────────────── */
-  .math-inline {
-    display: inline-block;
-    vertical-align: middle;
-    line-height: 1;
-  }
-  .math-inline svg {
-    vertical-align: middle;
-    display: inline-block;
-  }
-  .math-display {
-    display: block;
-    text-align: center;
-    margin: 0.7em 0;
-    overflow-x: auto;
-  }
-  .math-display svg {
-    display: inline-block;
-    max-width: 100%;
-  }
-  .math-fallback {
-    font-family: "Latin Modern Mono", "Courier New", monospace;
-    font-size: 10pt;
-    background: #f4f4f4;
-    padding: 0.1em 0.3em;
-    border-radius: 2px;
-  }
-  div.math-fallback {
-    display: block;
-    text-align: center;
-    margin: 0.5em 0;
-    padding: 0.5em;
-  }
-  .math-error {
-    color: var(--red);
-    font-size: 9pt;
-  }
+\newtcolorbox{hintone}{
+  colback=passgreenlight, colframe=passgreen, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{passgreen},
+  title={\small\sffamily\bfseries\textsc{Tier 1 --- Conceptual Nudge}},
+  fonttitle=\color{passgreen},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=passgreenlight, colframe=passgreenlight},
+}
 
-  /* ── Common errors list ─────────────────── */
-  .error-list li {
-    color: var(--red);
-  }
-  .error-list li span {
-    color: var(--text);
-  }
-</style>
-</head>
-<body>
+\newtcolorbox{hinttwo}{
+  colback=warnamberlight, colframe=warnamber, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{warnamber},
+  title={\small\sffamily\bfseries\textsc{Tier 2 --- The Tool}},
+  fonttitle=\color{warnamber},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=warnamberlight, colframe=warnamberlight},
+}
 
-<!-- ═══ TITLE PAGE ═══ -->
-<div class="title-page">
-  <h1>{{ title }}</h1>
-  <div class="rule"></div>
-  <div class="subtitle">{{ subtitle }}</div>
-  <table class="summary-table">
-    <tr><th>Problems</th><td>{{ entries|length }}</td></tr>
-    {% set ns = namespace(v=0, f=0, r=0) %}
-    {% for e in entries %}
-      {% if e.verification %}
-        {% set status = e.verification.get("overall", {}).get("status", "") %}
-        {% if status == "verified" %}{% set ns.v = ns.v + 1 %}
-        {% elif status == "flagged" %}{% set ns.f = ns.f + 1 %}
-        {% elif status == "rejected" %}{% set ns.r = ns.r + 1 %}{% endif %}
-      {% endif %}
-    {% endfor %}
-    <tr><th>Verified</th><td>{{ ns.v }} passed, {{ ns.f }} flagged, {{ ns.r }} rejected</td></tr>
-    <tr><th>Generated by</th><td>MathPipe</td></tr>
-  </table>
-  <div class="meta" style="margin-top:2em;">Compiled {{ generated_date }}</div>
-</div>
+\newtcolorbox{hintthree}{
+  colback=accentlight, colframe=accent, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{accent},
+  title={\small\sffamily\bfseries\textsc{Tier 3 --- Outline}},
+  fonttitle=\color{accent},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=accentlight, colframe=accentlight},
+}
 
-<!-- ═══ PROBLEMS ═══ -->
-{% for entry in entries %}
-{% set sol = entry.solution %}
-{% set ver = entry.verification %}
-{% set prob = entry.problem %}
-{% set badge = entry.badge %}
-{% set rec_id = sol.get("recommended_strategy", "s1") %}
-{% set strategies = sol.get("strategies", []) %}
+\newtcolorbox{insightbox}[1][]{
+  colback=white, colframe=accent!40, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0.5pt,
+  fonttitle=\small\sffamily\bfseries\color{accent},
+  title={#1},
+}
 
-<div class="problem">
+\newtcolorbox{postmortembox}{
+  colback=lightgrey, colframe=gray!50, breakable,
+  left=6pt, right=6pt, top=6pt, bottom=6pt, boxrule=0.5pt,
+}
 
-  <!-- Header -->
-  <div class="problem-header">
-    <span>Problem {{ entry.num }}</span>
-    <span class="badge {{ badge.cls }}">{{ badge.label }}</span>
-  </div>
+\newtcolorbox{stepbox}{
+  colback=blue!2, colframe=accent, breakable,
+  left=5pt, right=5pt, top=3pt, bottom=3pt,
+  boxrule=0pt, borderline west={2.5pt}{0pt}{accent},
+}
 
-  <!-- Problem statement -->
-  <div class="problem-statement">
-    {% if prob %}
-      {{ latex_to_html(prob.get("statement", sol.get("problem_statement", ""))) }}
-    {% else %}
-      {{ latex_to_html(sol.get("problem_statement", "Problem statement not available.")) }}
-    {% endif %}
-  </div>
+% ── Headers / footers ──────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{accent}{\textit{<< title_esc >>}}}
+\fancyhead[R]{\small\textcolor{accent}{\textit{<< subtitle_esc >>}}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
 
-  <!-- Classification -->
-  {% set cls = sol.get("classification", {}) %}
-  {% if cls %}
-  <h3>Classification</h3>
-  <p>
-    <strong>{{ cls.get("primary_archetype", "—") }}</strong>
-    {% if cls.get("secondary_archetypes") %}
-      &ensp;|&ensp;Also: {{ cls.get("secondary_archetypes", [])|join(", ") }}
-    {% endif %}
-    {% if cls.get("confidence") is not none %}
-      &ensp;|&ensp;Confidence: {{ "%.0f"|format(cls.get("confidence", 0) * 100) }}%
-    {% endif %}
-  </p>
-  {% if cls.get("reasoning") %}
-    <p style="font-size:10pt;color:var(--text-light);">{{ cls.get("reasoning") }}</p>
-  {% endif %}
-  {% endif %}
+% ── Section formatting ─────────────────────────────────
+\titleformat{\section}
+  {\Large\bfseries\color{accent}}{}{0pt}{}
+  [\vspace{-0.4em}\textcolor{accent}{\rule{\textwidth}{0.8pt}}]
+\titleformat{\subsection}
+  {\large\bfseries\color{accent}}{}{0pt}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.5em}
+\titlespacing*{\subsection}{0pt}{0.8em}{0.3em}
 
-  <!-- Progressive hints -->
-  {% for strat in strategies %}
-  {% if strat.get("id") == rec_id and strat.get("hints") %}
-  {% set hints = strat["hints"] %}
-  <h3>Hints</h3>
-  {% if hints.get("tier1_conceptual") %}
-  <div class="hint-tier tier1">
-    <div class="hint-label">Tier 1 — Conceptual Nudge</div>
-    {{ latex_to_html(hints["tier1_conceptual"]) }}
-  </div>
-  {% endif %}
-  {% if hints.get("tier2_strategic") %}
-  <div class="hint-tier tier2">
-    <div class="hint-label">Tier 2 — The Tool</div>
-    {{ latex_to_html(hints["tier2_strategic"]) }}
-  </div>
-  {% endif %}
-  {% if hints.get("tier3_outline") %}
-  <div class="hint-tier tier3">
-    <div class="hint-label">Tier 3 — Outline</div>
-    {{ latex_to_html(hints["tier3_outline"]) }}
-  </div>
-  {% endif %}
-  {% endif %}
-  {% endfor %}
+% ── Custom macros (from course preamble) ───────────────
+<< preamble_macros >>
 
-  <!-- Solution (recommended strategy) -->
-  {% for strat in strategies %}
-  {% if strat.get("id") == rec_id %}
-  <h3>Solution{% if strategies|length > 1 %}: {{ strat.get("approach_name", "Primary") }}{% endif %}</h3>
+% ── Common math shortcuts ──────────────────────────────
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\N}{\mathbb{N}}
+\providecommand{\Z}{\mathbb{Z}}
+\providecommand{\Q}{\mathbb{Q}}
+\providecommand{\C}{\mathbb{C}}
+\providecommand{\F}{\mathbb{F}}
+% Operator names (safe even if already defined)
+\providecommand{\rank}{\operatorname{rank}}
+\providecommand{\nullity}{\operatorname{nullity}}
+\providecommand{\Span}{\operatorname{span}}
+\renewcommand{\Im}{\operatorname{Im}}
+\providecommand{\tr}{\operatorname{tr}}
+\providecommand{\diag}{\operatorname{diag}}
+\providecommand{\adj}{\operatorname{adj}}
+\providecommand{\sgn}{\operatorname{sgn}}
+\providecommand{\norm}[1]{\left\|#1\right\|}
+\providecommand{\abs}[1]{\left|#1\right|}
+\providecommand{\inner}[2]{\langle #1,\, #2 \rangle}
 
-  {% if strat.get("confidence") is not none %}
-  <p style="font-size:10pt;color:var(--text-light);">
-    Strategy confidence: {{ "%.0f"|format(strat.get("confidence", 0) * 100) }}%
-  </p>
-  {% endif %}
+\begin{document}
 
-  {% if strat.get("solution") %}
-    {{ latex_to_html(strat["solution"]) }}
-  {% endif %}
+% ═══════════════════ TITLE PAGE ═══════════════════════
+\begin{titlepage}
+\centering
+\vspace*{3cm}
 
-  <!-- Solution steps -->
-  {% if strat.get("solution_steps") %}
-  <h4>Step-by-step breakdown</h4>
-  {% for step in strat["solution_steps"] %}
-  <div class="step">
-    <span class="step-num">Step {{ step.get("step", loop.index) }}.</span>
-    {{ latex_to_html(step.get("action", "")) }}
-    {% if step.get("justification") %}
-    <div class="justification">{{ latex_to_html(step["justification"]) }}</div>
-    {% endif %}
-    {% if step.get("kb_references") %}
-    <div class="kb-refs">Refs: {{ step["kb_references"]|join(", ") }}</div>
-    {% endif %}
-  </div>
-  {% endfor %}
-  {% endif %}
+{\Huge\bfseries\color{accent} << title_esc >>}
 
-  {% endif %}
-  {% endfor %}
+\vspace{0.5cm}
+{\color{accent}\rule{0.6\textwidth}{1.5pt}}
+\vspace{0.5cm}
 
-  <!-- Alternative strategies (brief) -->
-  {% if strategies|length > 1 %}
-  <h3>Alternative Approaches</h3>
-  {% for strat in strategies %}
-  {% if strat.get("id") != rec_id %}
-  <h4>{{ strat.get("approach_name", "Strategy " + strat.get("id", "?")) }}
-    {% if strat.get("confidence") is not none %}
-      ({{ "%.0f"|format(strat.get("confidence", 0) * 100) }}%)
-    {% endif %}
-  </h4>
-  {% if strat.get("solution") %}
-    {{ latex_to_html(strat["solution"]) }}
-  {% elif strat.get("attack_plan") %}
-    <ol>
-    {% for step in strat["attack_plan"] %}
-      <li>{{ latex_to_html(step) }}</li>
-    {% endfor %}
-    </ol>
-  {% endif %}
-  {% endif %}
-  {% endfor %}
-  {% endif %}
+{\Large\color{gray} << subtitle_esc >>}
 
-  <!-- Verification detail -->
-  {% if ver %}
-  {% set overall = ver.get("overall", {}) %}
-  <div class="verification-detail">
-    <strong>Verification Report</strong>
-    <div class="check-row">
-      <span>Structural check</span>
-      {% set sc = ver.get("structural_check", {}).get("status", "—") %}
-      <span class="{% if sc == 'PASS' %}check-pass{% elif sc == 'WARN' %}check-warn{% else %}check-fail{% endif %}">{{ sc }}</span>
-    </div>
-    <div class="check-row">
-      <span>Adversarial check</span>
-      {% set ac = ver.get("adversarial_check", {}).get("status", "—") %}
-      <span class="{% if ac == 'PASS' %}check-pass{% elif ac == 'FLAG' %}check-warn{% else %}check-fail{% endif %}">{{ ac }}</span>
-    </div>
-    <div class="check-row">
-      <span>Consistency check</span>
-      {% set cc = ver.get("consistency_check", {}).get("status", "—") %}
-      <span class="{% if cc == 'PASS' %}check-pass{% elif cc == 'WARN' %}check-warn{% else %}check-fail{% endif %}">{{ cc }}</span>
-    </div>
-    {% if overall.get("summary") %}
-    <p style="margin-top:0.4em;font-size:10pt;">{{ overall["summary"] }}</p>
-    {% endif %}
-    {% if overall.get("human_review_required") and overall.get("human_review_reason") %}
-    <p style="margin-top:0.3em;font-size:10pt;color:var(--amber);">
-      &#9888; {{ overall["human_review_reason"] }}
-    </p>
-    {% endif %}
-  </div>
-  {% endif %}
+\vspace{2cm}
 
-  <!-- Postmortem -->
-  {% set pm = sol.get("postmortem", {}) %}
-  {% if pm %}
-  <div class="postmortem">
-    <h3>Postmortem</h3>
+\begin{tabular}{r l}
+\textcolor{accent}{\textbf{Problems}} & << num_problems >> \\[4pt]
+\textcolor{accent}{\textbf{Verified}} & << num_verified >> passed, << num_flagged >> flagged, << num_rejected >> rejected \\[4pt]
+\textcolor{accent}{\textbf{Generated by}} & MathPipe \\
+\end{tabular}
 
-    {% if pm.get("key_insight") %}
-    <div class="insight-box">
-      <div class="label">Key Insight</div>
-      {{ latex_to_html(pm["key_insight"]) }}
-    </div>
-    {% endif %}
+\vfill
+{\small\color{gray} Compiled << generated_date >>}
+\end{titlepage}
 
-    {% if pm.get("transferable_technique") %}
-    <div class="insight-box">
-      <div class="label">Transferable Technique</div>
-      {{ latex_to_html(pm["transferable_technique"]) }}
-    </div>
-    {% endif %}
+% ═══════════════════ PROBLEMS ═════════════════════════
+<% for entry in entries %>
+<% set sol = entry.solution %>
+<% set ver = entry.verification %>
+<% set prob = entry.problem %>
+<% set badge = entry.badge %>
+<% set rec_id = sol.get("recommended_strategy", "s1") %>
+<% set strategies = sol.get("strategies", []) %>
 
-    {% if pm.get("common_errors") %}
-    <h4>Common Errors</h4>
-    <ul class="error-list">
-    {% for err in pm["common_errors"] %}
-      <li><span>{{ latex_to_html(err) }}</span></li>
-    {% endfor %}
-    </ul>
-    {% endif %}
+\clearpage
+% ─── Problem << entry.num >> ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem << entry.num >>%
+    \hfill
+    \small\colorbox{<< badge.colour >>light}{\textcolor{<< badge.colour >>}{\textsf{<< badge.label >>}}}%
+  }%
+}
+\vspace{0.4em}
 
-    {% if pm.get("deeper_connections") %}
-    <h4>Deeper Connections</h4>
-    <p>{{ latex_to_html(pm["deeper_connections"]) }}</p>
-    {% endif %}
+% Problem statement
+<% if prob %>
+\begin{problembox}
+<< t(prob.get("statement", sol.get("problem_statement", ""))) >>
+\end{problembox}
+<% else %>
+\begin{problembox}
+<< t(sol.get("problem_statement", "Problem statement not available.")) >>
+\end{problembox}
+<% endif %>
 
-    {% if pm.get("variant_problems") %}
-    <h4>Variant Problems</h4>
-    <ul>
-    {% for v in pm["variant_problems"] %}
-      <li>{{ latex_to_html(v) }}</li>
-    {% endfor %}
-    </ul>
-    {% endif %}
-  </div>
-  {% endif %}
+% Classification
+<% set cls = sol.get("classification", {}) %>
+<% if cls %>
+\subsection*{Classification}
 
-</div>
-{% endfor %}
+\textbf{<< cls.get("primary_archetype", "---") >>}%
+<% if cls.get("secondary_archetypes") %>
+\enspace$|$\enspace Also: << cls.get("secondary_archetypes", [])|join(", ") >>%
+<% endif %>
+<% if cls.get("confidence") is not none %>
+\enspace$|$\enspace Confidence: << "%.0f"|format(cls.get("confidence", 0) * 100) >>\%%
+<% endif %>
 
-</body>
-</html>
+<% if cls.get("reasoning") %>
+
+{\small\color{gray} << t(cls.get("reasoning", "")) >>}
+<% endif %>
+<% endif %>
+
+% Hints
+<% for strat in strategies %>
+<% if strat.get("id") == rec_id and strat.get("hints") %>
+<% set hints = strat["hints"] %>
+\subsection*{Hints}
+
+<% if hints.get("tier1_conceptual") %>
+\begin{hintone}
+<< t(hints["tier1_conceptual"]) >>
+\end{hintone}
+\vspace{0.3em}
+<% endif %>
+<% if hints.get("tier2_strategic") %>
+\begin{hinttwo}
+<< t(hints["tier2_strategic"]) >>
+\end{hinttwo}
+\vspace{0.3em}
+<% endif %>
+<% if hints.get("tier3_outline") %>
+\begin{hintthree}
+<< t(hints["tier3_outline"]) >>
+\end{hintthree}
+<% endif %>
+<% endif %>
+<% endfor %>
+
+% Solution (recommended strategy)
+<% for strat in strategies %>
+<% if strat.get("id") == rec_id %>
+\subsection*{Solution<% if strategies|length > 1 %>: << strat.get("approach_name", "Primary") >><% endif %>}
+
+<% if strat.get("confidence") is not none %>
+{\small\color{gray} Strategy confidence: << "%.0f"|format(strat.get("confidence", 0) * 100) >>\%}
+\medskip
+<% endif %>
+
+<% if strat.get("solution") %>
+<< t(strat["solution"]) >>
+<% endif %>
+
+% Step-by-step breakdown
+<% if strat.get("solution_steps") %>
+\subsubsection*{Step-by-step breakdown}
+<% for step in strat["solution_steps"] %>
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step << step.get("step", loop.index) >>.}} << t(step.get("action", "")) >>
+<% if step.get("justification") %>
+
+{\small\color{gray} << t(step["justification"]) >>}
+<% endif %>
+<% if step.get("kb_references") %>
+
+{\footnotesize\color{gray!70} Refs: << step["kb_references"]|join(", ") >>}
+<% endif %>
+\end{stepbox}
+<% endfor %>
+<% endif %>
+
+<% endif %>
+<% endfor %>
+
+% Alternative strategies
+<% if strategies|length > 1 %>
+\subsection*{Alternative Approaches}
+<% for strat in strategies %>
+<% if strat.get("id") != rec_id %>
+\subsubsection*{<< strat.get("approach_name", "Strategy " + strat.get("id", "?")) >><% if strat.get("confidence") is not none %> (<< "%.0f"|format(strat.get("confidence", 0) * 100) >>\%)<% endif %>}
+
+<% if strat.get("solution") %>
+<< t(strat["solution"]) >>
+<% elif strat.get("attack_plan") %>
+\begin{enumerate}[nosep]
+<% for step in strat["attack_plan"] %>
+  \item << t(step) >>
+<% endfor %>
+\end{enumerate}
+<% endif %>
+<% endif %>
+<% endfor %>
+<% endif %>
+
+% Verification
+<% if ver %>
+<% set overall = ver.get("overall", {}) %>
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+<% set sc = ver.get("structural_check", {}).get("status", "---") %>
+Structural check & \textcolor{<< check_colour(sc) >>}{\textsf{<< sc >>}} \\
+<% set ac = ver.get("adversarial_check", {}).get("status", "---") %>
+Adversarial check & \textcolor{<< check_colour(ac) >>}{\textsf{<< ac >>}} \\
+<% set cc = ver.get("consistency_check", {}).get("status", "---") %>
+Consistency check & \textcolor{<< check_colour(cc) >>}{\textsf{<< cc >>}} \\
+\end{tabular}
+
+<% if overall.get("summary") %>
+\smallskip
+{\small << t(overall["summary"]) >>}
+<% endif %>
+<% if overall.get("human_review_required") and overall.get("human_review_reason") %>
+
+{\small\color{warnamber} $\triangle$ << t(overall["human_review_reason"]) >>}
+<% endif %>
+<% endif %>
+
+% Postmortem
+<% set pm = sol.get("postmortem", {}) %>
+<% if pm %>
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+<% if pm.get("key_insight") %>
+\begin{insightbox}[Key Insight]
+<< t(pm["key_insight"]) >>
+\end{insightbox}
+<% endif %>
+
+<% if pm.get("transferable_technique") %>
+\begin{insightbox}[Transferable Technique]
+<< t(pm["transferable_technique"]) >>
+\end{insightbox}
+<% endif %>
+
+<% if pm.get("common_errors") %>
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+<% for err in pm["common_errors"] %>
+  \item \textcolor{failred}{$\bullet$} << t(err) >>
+<% endfor %>
+\end{itemize}
+<% endif %>
+
+<% if pm.get("deeper_connections") %>
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+<< t(pm["deeper_connections"]) >>
+<% endif %>
+
+<% if pm.get("variant_problems") %>
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+<% for v in pm["variant_problems"] %>
+  \item << t(v) >>
+<% endfor %>
+\end{itemize}
+<% endif %>
+
+\end{postmortembox}
+<% endif %>
+
+<% endfor %>
+
+\end{document}
 """)
 
 
-# ── PDF generation ───────────────────────────────────────────────────
+# ── Title inference ──────────────────────────────────────────────────
 
 
 def _prettify_course_id(course_id: str) -> str:
     """Turn a course_id like 'linalg_ii_ht2026' into 'Linear Algebra II — HT 2026'."""
-    # Common abbreviation expansions
     _ABBREVS = {
         "linalg": "Linear Algebra",
         "alg": "Algebra",
@@ -823,36 +668,31 @@ def _prettify_course_id(course_id: str) -> str:
     term_part = ""
 
     for p in parts:
-        # Term + year like "ht2026"
         term_match = re.match(r"^(ht|mt|tt)(\d{4})$", p)
         if term_match:
             term_part = f"{_TERMS[term_match.group(1)]} {term_match.group(2)}"
             continue
-        # Roman numerals
         if p in _ROMAN:
             course_parts.append(p.upper())
             continue
-        # Known abbreviations
         if p in _ABBREVS:
             course_parts.append(_ABBREVS[p])
             continue
-        # Bare year
         if re.match(r"^\d{4}$", p):
             term_part = term_part or p
             continue
-        # Default: capitalize
         course_parts.append(p.capitalize())
 
     name = " ".join(course_parts)
     if term_part:
-        name += f" — {term_part}"
+        name += f" --- {term_part}"
     return name
 
 
 def _infer_title_from_config(work_dir: Path) -> str | None:
     """Try to find the course config and return the course_name."""
-    # Walk up from work_dir looking for config/*.yaml that has course_name
     import yaml
+
     for parent in [work_dir, *work_dir.parents]:
         config_dir = parent / "config"
         if config_dir.is_dir():
@@ -863,10 +703,84 @@ def _infer_title_from_config(work_dir: Path) -> str | None:
                         return data["course_name"]
                 except Exception:
                     continue
-        # Stop at the repo root
         if (parent / ".git").exists():
             break
     return None
+
+
+# ── LaTeX compiler ───────────────────────────────────────────────────
+
+
+def _find_latex_compiler() -> str | None:
+    """Return the path to a usable LaTeX compiler, or None."""
+    for cmd in ("latexmk", "pdflatex", "xelatex", "lualatex"):
+        path = shutil.which(cmd)
+        if path:
+            return cmd
+    return None
+
+
+def _compile_tex(tex_path: Path, output_dir: Path) -> Path:
+    """Compile a .tex file to PDF and return the output PDF path."""
+    compiler = _find_latex_compiler()
+    if compiler is None:
+        raise RuntimeError(
+            "No LaTeX compiler found. Install a TeX distribution:\n"
+            "  macOS:  brew install --cask mactex   (or basictex)\n"
+            "  Linux:  sudo apt install texlive-full\n"
+            "  Windows: install MiKTeX from https://miktex.org\n\n"
+            f"The .tex source has been written to: {tex_path}"
+        )
+
+    if compiler == "latexmk":
+        cmd = [
+            "latexmk", "-pdf", "-interaction=nonstopmode",
+            "-output-directory=" + str(output_dir),
+            str(tex_path),
+        ]
+    else:
+        cmd = [
+            compiler, "-interaction=nonstopmode",
+            "-output-directory=" + str(output_dir),
+            str(tex_path),
+        ]
+
+    # Run twice for cross-references (latexmk handles this itself)
+    passes = 1 if compiler == "latexmk" else 2
+
+    for i in range(passes):
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0 and i == passes - 1:
+            # Extract the most relevant error lines from the log
+            log_file = output_dir / tex_path.with_suffix(".log").name
+            error_lines = ""
+            if log_file.exists():
+                log = log_file.read_text(errors="replace")
+                # Find lines starting with "!" (LaTeX errors)
+                errors = [
+                    ln for ln in log.splitlines() if ln.startswith("!")
+                ]
+                if errors:
+                    error_lines = "\n  ".join(errors[:10])
+
+            msg = f"LaTeX compilation failed ({compiler})."
+            if error_lines:
+                msg += f"\n  {error_lines}"
+            msg += f"\n\nTeX source: {tex_path}"
+            msg += f"\nFull log:   {log_file}"
+            print(msg, file=sys.stderr)
+            # Don't raise — we still wrote the .tex file
+
+    pdf_name = tex_path.with_suffix(".pdf").name
+    return output_dir / pdf_name
+
+
+# ── Main compile function ────────────────────────────────────────────
 
 
 def compile_pdf(
@@ -875,7 +789,7 @@ def compile_pdf(
     title: str | None = None,
     subtitle: str | None = None,
 ) -> Path:
-    """Compile solution files from work_dir into a PDF.
+    """Compile solution files from work_dir into a PDF via LaTeX.
 
     Args:
         work_dir: Directory containing solution_N.json, etc.
@@ -896,12 +810,10 @@ def compile_pdf(
     for e in entries:
         e["badge"] = verification_badge(e.get("verification"))
 
-    # Infer title from directory structure or course config
+    # Infer title
+    parts = work_dir.resolve().parts
     if not title:
-        parts = work_dir.resolve().parts
-        # Try to load course config for the proper name
         title = _infer_title_from_config(work_dir)
-
         if not title and len(parts) >= 2:
             title = _prettify_course_id(parts[-2])
         elif not title:
@@ -910,7 +822,6 @@ def compile_pdf(
     if not subtitle:
         if len(parts) >= 2:
             sheet_dir = parts[-1]
-            # Extract just the number from "sheet_1" or "sheet_5356765"
             sheet_match = re.search(r"(\d+)", sheet_dir)
             if sheet_match:
                 subtitle = f"Problem Sheet {sheet_match.group(1)}"
@@ -919,31 +830,62 @@ def compile_pdf(
         else:
             subtitle = f"{len(entries)} Problems"
 
-    # Reset the math renderer for this compile run
-    global _renderer
-    _renderer = MathRenderer()
+    # Count verification stats
+    n_verified = n_flagged = n_rejected = 0
+    for e in entries:
+        v = e.get("verification")
+        if v:
+            st = v.get("overall", {}).get("status", "")
+            if st == "verified":
+                n_verified += 1
+            elif st == "flagged":
+                n_flagged += 1
+            elif st == "rejected":
+                n_rejected += 1
 
-    # Render HTML template (first pass — collects math fragments as placeholders)
-    html_str = HTML_TEMPLATE.render(
-        title=title,
-        subtitle=subtitle,
-        entries=entries,
-        latex_to_html=latex_to_html,
+    # Extract custom macros from course preamble
+    preamble_macros = _extract_preamble_macros(work_dir)
+
+    # Render the LaTeX template
+    tex_source = LATEX_TEMPLATE.render(
+        title_esc=_escape_tex(title),
+        subtitle_esc=_escape_tex(subtitle),
+        num_problems=len(entries),
+        num_verified=n_verified,
+        num_flagged=n_flagged,
+        num_rejected=n_rejected,
         generated_date=date.today().strftime("%d %B %Y"),
+        entries=entries,
+        preamble_macros=preamble_macros,
+        t=text_to_latex,
+        check_colour=_check_colour,
     )
 
-    # Batch-render all LaTeX fragments to SVG via MathJax
-    renderer = _get_renderer()
-    renderer.render_all()
+    # Write .tex file alongside the solutions
+    tex_path = work_dir / "solutions.tex"
+    tex_path.write_text(tex_source, encoding="utf-8")
+    print(f"TeX source written: {tex_path}")
 
-    # Second pass — substitute placeholders with rendered SVGs
-    html_str = renderer.substitute(html_str)
-
-    # Write PDF
+    # Compile to PDF
     if output_path is None:
         output_path = work_dir / "solutions.pdf"
 
-    HTML(string=html_str).write_pdf(str(output_path))
+    try:
+        pdf_out = _compile_tex(tex_path, work_dir)
+        # Move to the desired output path if different
+        if pdf_out.resolve() != output_path.resolve():
+            shutil.move(str(pdf_out), str(output_path))
+    except RuntimeError as e:
+        print(str(e), file=sys.stderr)
+        # Even if compilation fails, the .tex file is available
+        return tex_path
+
+    # Clean up LaTeX auxiliary files
+    for ext in (".aux", ".log", ".out", ".fls", ".fdb_latexmk", ".synctex.gz"):
+        aux = work_dir / f"solutions{ext}"
+        if aux.exists():
+            aux.unlink()
+
     return output_path
 
 
@@ -952,7 +894,7 @@ def compile_pdf(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Compile MathPipe solution files into a formatted PDF.",
+        description="Compile MathPipe solution files into a formatted PDF via LaTeX.",
     )
     parser.add_argument(
         "work_dir",
@@ -981,8 +923,12 @@ def main() -> int:
             title=args.title,
             subtitle=args.subtitle,
         )
-        size_kb = out.stat().st_size / 1024
-        print(f"PDF compiled: {out} ({size_kb:.0f} KB)")
+        if out.suffix == ".pdf" and out.exists():
+            size_kb = out.stat().st_size / 1024
+            print(f"PDF compiled: {out} ({size_kb:.0f} KB)")
+        elif out.suffix == ".tex":
+            print(f"TeX source available at: {out}")
+            print("Compile manually: pdflatex solutions.tex")
         return 0
     except FileNotFoundError as e:
         print(f"Error: {e}")
