@@ -121,8 +121,8 @@ _UNICODE_SYMBOLS = {
     '\u2026': '\\ldots', '\u22ef': '\\cdots',
     '\u22ee': '\\vdots', '\u22f1': '\\ddots',
     # Miscellaneous
-    '\u2713': '{\\checkmark}', '\u2714': '{\\checkmark}',  # ✓ ✔
-    '\u2717': '{\\times}', '\u2718': '{\\times}',  # ✗ ✘
+    '\u2713': '\\checkmark', '\u2714': '\\checkmark',  # ✓ ✔
+    '\u2717': '\\times', '\u2718': '\\times',  # ✗ ✘
     '\u25b3': '\\triangle', '\u25bd': '\\triangledown',
     '\u22c6': '\\star', '\u2606': '\\star',
     '\u2016': '\\|',  # ‖ double vertical line
@@ -321,10 +321,12 @@ def _pattern_subscript_superscript(text: str) -> str:
     _BASE = (
         r'(?:\d+|[A-Za-z]+|\\[a-zA-Z]+(?:\{[^}]*\})?|\([^)]*\))'
     )
+    # Subscript/superscript argument: {braced}, single char, or (parenthesized)
+    _SCRIPT_ARG = r'(?:\{[^}]*\}|[A-Za-z0-9]|\([^)]*\))'
     # Optional digit prefix (e.g. 2D_{n-1})
     _TOKEN_WITH_SCRIPT = (
         r'(?:\d*' + _BASE +
-        r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))+'
+        r'(?:(?<!\\)[_^]' + _SCRIPT_ARG + r')+'
         r'(?:\([^)]*\))?)'
     )
     return re.sub(
@@ -350,7 +352,7 @@ def _pattern_standalone_commands(text: str) -> str:
     )
     return re.sub(
         r'(\\(?:' + _STANDALONE + r')'
-        r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))*'
+        r'(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]|\([^)]*\)))*'
         r')'
         r'(?![a-zA-Z])',
         r'$\1$',
@@ -392,43 +394,27 @@ def _pattern_operator_expressions(text: str) -> str:
 
 
 def _merge_math_blocks(text: str) -> str:
-    """Merge adjacent $…$ blocks connected by operators or bare numbers/vars."""
-    result = text
-    _MERGE_OPS = r'(?:[=+\-*/,<>]|' + _LATEX_MATH_OPS + r')'
+    """Merge adjacent $…$ blocks connected by operators or bare numbers/vars.
 
-    # Merge  $A$ op $B$  →  $A op B$
-    changed = True
-    while changed:
-        new = re.sub(
-            r'\$([^$]+)\$\s*(' + _MERGE_OPS + r')\s*\$([^$]+)\$',
-            r'$\1 \2 \3$',
-            result,
-        )
-        changed = new != result
-        result = new
-
-    # Merge  $A$$B$  or  $A$ $B$  (adjacent with optional whitespace)  →  $A B$
-    changed = True
-    while changed:
-        new = re.sub(r'\$([^$]+)\$\s*\$([^$]+)\$', r'$\1 \2$', result)
-        changed = new != result
-        result = new
-
-    # Merge  $A$ gap $B$  where gap is "math-like" text (operators, parens,
-    # digits, short identifiers, \cdot, ^{}, etc.) — not plain English.
-    _MATH_GAP = (
-        r'(?:'
-        r'[=+\-*/,<>|().\[\]:;!?^_{}\s\d]'  # operators, parens, braces, digits, ws
-        r'|\\(?:cdot|times|div|pm|mp|leq|geq|neq|in|notin|to|mapsto'
-        r'|ldots|cdots|quad|qquad|enspace|;|,)'   # LaTeX math commands
-        r'|[A-Za-z](?![A-Za-z]{2})'          # single letter (not part of 3+ word)
-        r')+'
-    )
-    # Condition: gap must contain a math operator AND no English words (3+ letters)
+    Uses _split_math_text to properly identify $…$ boundaries (avoiding the
+    ambiguity where a closing $ could be mistaken for an opening $ of a
+    phantom block).
+    """
+    # ── helpers ───────────────────────────────────────────────────────
     _GAP_OPERATOR_RE = re.compile(
         r'[=+\-*/<>^_()]'
         r'|\\(?:cdot|times|div|pm|mp|leq|geq|neq|in|to|mapsto)'
     )
+
+    def _is_inline_math(s: str) -> bool:
+        """True if *s* is an inline $…$ block (not display math)."""
+        return (s.startswith('$') and s.endswith('$')
+                and not s.startswith('$$')
+                and not s.startswith('\\['))
+
+    def _inner(s: str) -> str:
+        """Strip the outer $ delimiters from an inline $…$ block."""
+        return s[1:-1]
 
     def _should_merge_gap(gap: str) -> bool:
         stripped = gap.strip()
@@ -442,41 +428,94 @@ def _merge_math_blocks(text: str) -> str:
             return False
         return True
 
-    changed = True
-    iters = 0
-    while changed and iters < 30:
-        new = re.sub(
-            r'\$([^$]+)\$(' + _MATH_GAP + r')\$([^$]+)\$',
-            lambda m: '$' + m.group(1) + ' ' + m.group(2).strip() + ' ' + m.group(3) + '$'
-            if _should_merge_gap(m.group(2))
-            else m.group(0),
-            result,
-        )
-        changed = new != result
-        result = new
-        iters += 1
-
-    # Also absorb a bare number or single-letter variable adjacent to a $ block.
-    # Handles both simple operators (=, +, -) and LaTeX operators (\in, \oplus).
-    # e.g. $D_n$ = 2  →  $D_n = 2$
-    #      x \in $\mathbb{R}$  →  $x \in \mathbb{R}$
-    #      $V = U$ \oplus W  →  $V = U \oplus W$
     _BARE_ATOM = r'(?:-?\d+(?:\.\d+)?[A-Za-z]?|[A-Za-z])'
     _ANY_OP = r'(?:[=+\-*/<>]|' + _LATEX_MATH_OPS + r')'
+
+    # ── iterative merge loop ─────────────────────────────────────────
+    result = text
     changed = True
-    while changed:
-        new = re.sub(
-            r'\$([^$]+)\$\s*(' + _ANY_OP + r')\s*(' + _BARE_ATOM + r')(?![A-Za-z_^$\\])',
-            r'$\1 \2 \3$',
-            result,
-        )
-        new = re.sub(
-            r'(?<![A-Za-z_^$\\])(' + _BARE_ATOM + r')\s*(' + _ANY_OP + r')\s*\$([^$]+)\$',
-            r'$\1 \2 \3$',
-            new,
-        )
-        changed = new != result
-        result = new
+    iters = 0
+    while changed and iters < 40:
+        changed = False
+        iters += 1
+
+        parts = _split_math_text(result)
+        # parts = [text0, math1, text1, math2, text2, ...]
+        # Odd indices are math segments.
+        if len(parts) < 3:
+            break  # nothing to merge (0 or 1 math blocks)
+
+        merged: list[str] = []
+        i = 0
+        while i < len(parts):
+            if i % 2 == 0:
+                # Non-math segment
+                merged.append(parts[i])
+                i += 1
+                continue
+
+            # parts[i] is a math segment
+            cur_math = parts[i]
+
+            # Only merge inline $…$ blocks (not display math / environments)
+            if not _is_inline_math(cur_math):
+                merged.append(cur_math)
+                i += 1
+                continue
+
+            # Try to merge with subsequent math blocks
+            while i + 2 < len(parts):
+                gap = parts[i + 1]   # text between this and next math
+                nxt = parts[i + 2]   # next math block
+
+                if not _is_inline_math(nxt):
+                    break
+
+                # (a) Whitespace-only gap → merge
+                if gap.strip() == '':
+                    cur_math = '$' + _inner(cur_math) + ' ' + _inner(nxt) + '$'
+                    changed = True
+                    i += 2
+                    continue
+
+                # (b) Math-like gap (operators, single letters, digits)
+                if _should_merge_gap(gap):
+                    cur_math = '$' + _inner(cur_math) + ' ' + gap.strip() + ' ' + _inner(nxt) + '$'
+                    changed = True
+                    i += 2
+                    continue
+
+                break  # gap is English text, stop merging
+
+            # Try to absorb bare atoms from surrounding text
+            # Right side: $A$ op atom  →  $A op atom$
+            if merged and i + 1 < len(parts):
+                right_text = parts[i + 1] if i + 1 < len(parts) else ''
+                m_right = re.match(
+                    r'(\s*)(' + _ANY_OP + r')(\s*)(' + _BARE_ATOM + r')(?![A-Za-z_^$\\])',
+                    right_text,
+                )
+                if m_right and _is_inline_math(cur_math):
+                    cur_math = '$' + _inner(cur_math) + ' ' + m_right.group(2) + ' ' + m_right.group(4) + '$'
+                    parts[i + 1] = right_text[m_right.end():]
+                    changed = True
+
+            # Left side: atom op $B$  →  $atom op B$
+            if merged and _is_inline_math(cur_math):
+                left_text = merged[-1]
+                m_left = re.search(
+                    r'(?<![A-Za-z_^$\\])(' + _BARE_ATOM + r')(\s*)(' + _ANY_OP + r')(\s*)$',
+                    left_text,
+                )
+                if m_left:
+                    cur_math = '$' + m_left.group(1) + ' ' + m_left.group(3) + ' ' + _inner(cur_math) + '$'
+                    merged[-1] = left_text[:m_left.start()]
+                    changed = True
+
+            merged.append(cur_math)
+            i += 1
+
+        result = ''.join(merged)
 
     return result
 
@@ -499,13 +538,36 @@ def _safety_wrap_bare_commands(text: str) -> str:
         r'$\1$',
         text,
     )
-    # Wrap bare ^{…} or _{…} that escaped processing
+    # Wrap bare ^{…}, _{…}, ^(…) that escaped processing
     result = re.sub(
-        r'((?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9])(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]))*)',
+        r'((?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]|\([^)]*\))(?:(?<!\\)[_^](?:\{[^}]*\}|[A-Za-z0-9]|\([^)]*\)))*)',
         r'$\1$',
         result,
     )
     return result
+
+
+def _wrap_remaining_math_segments(text: str) -> str:
+    """Wrap non-math segments that are entirely math-like (no English words).
+
+    After the main pattern passes and merge, some segments may still contain
+    bare math operators/symbols with no prose.  This catches them.
+    """
+    def _wrap_segment(seg: str) -> str:
+        stripped = seg.strip()
+        if not stripped:
+            return seg
+        # Must contain a math trigger
+        if not _has_math_trigger(stripped):
+            return seg
+        # Remove LaTeX commands before checking for English words
+        text_only = re.sub(r'\\[a-zA-Z]+(?:\{[^}]*\})?', '', stripped)
+        # If no 3+ letter English words remain, wrap in $...$
+        if not re.search(r'[A-Za-z]{3,}', text_only):
+            return ' $' + stripped + '$ '
+        return seg
+
+    return _apply_to_non_math(text, _wrap_segment)
 
 
 def _wrap_bare_math(text: str) -> str:
@@ -524,6 +586,10 @@ def _wrap_bare_math(text: str) -> str:
     # Step 4: Safety net — wrap any remaining bare math commands
     text = _apply_to_non_math(text, _safety_wrap_bare_commands)
     # Step 5: Merge adjacent $…$ blocks   ($D_n$ = $n+1$  →  $D_n = n+1$)
+    text = _merge_math_blocks(text)
+    # Step 6: Wrap any remaining non-math segments that are entirely math
+    text = _wrap_remaining_math_segments(text)
+    # Step 7: Final merge pass (step 6 may have created new adjacent blocks)
     text = _merge_math_blocks(text)
     return text
 
@@ -1087,7 +1153,7 @@ LATEX_TEMPLATE = _JINJA_ENV.from_string(r"""\documentclass[11pt, a4paper]{articl
 <% endif %>
 <% if step.get("kb_references") %>
 
-{\footnotesize\color{gray!70} Refs: << step["kb_references"]|join(", ") >>}
+{\footnotesize\color{gray!70} Refs: << step["kb_references"]|join(", ")|replace("_", "\\_") >>}
 <% endif %>
 \end{stepbox}
 <% endfor %>
