@@ -420,6 +420,12 @@ def _merge_math_blocks(text: str) -> str:
         stripped = gap.strip()
         if not stripped or len(stripped) > 80:
             return False
+        # Never merge across newlines — they separate prose/list items
+        if '\n' in gap:
+            return False
+        # Never merge across markdown formatting markers
+        if '**' in gap or re.search(r'(?<!\*)\*(?!\*)', gap):
+            return False
         if not _GAP_OPERATOR_RE.search(stripped):
             return False
         # Remove LaTeX commands before checking for English words
@@ -570,6 +576,154 @@ def _wrap_remaining_math_segments(text: str) -> str:
     return _apply_to_non_math(text, _wrap_segment)
 
 
+def _escape_set_braces(text: str) -> str:
+    r"""Convert set-notation braces { … } to \{ … \} so LaTeX doesn't treat
+    them as grouping delimiters.
+
+    Detects patterns like:
+      {x : condition}     — set-builder notation
+      {u_1, ..., u_k}     — enumerated sets
+      {0}                 — singleton sets
+      {1, -1}             — small enumerated sets
+      span{v}             — span with set argument
+      \in {a,b,c}         — membership in a set
+
+    Does NOT touch braces that are part of LaTeX commands (e.g. \textbf{},
+    \mathbb{R}, _{subscript}, ^{superscript}).
+    """
+    def _is_set_content(content: str) -> bool:
+        """Heuristically determine if brace content is set notation."""
+        stripped = content.strip()
+        if not stripped:
+            return False
+        # Set-builder: {x : condition} or {x | condition}
+        if ':' in stripped and not stripped.startswith('array'):
+            return True
+        # Enumerated with ellipsis: {u_1, ..., u_k}
+        if '...' in stripped or '\\ldots' in stripped or '\\cdots' in stripped:
+            return True
+        # Tuple set: {(t, t, t) : ...}
+        if stripped.startswith('('):
+            return True
+        # Small enumerated set: {0}, {1, -1}, {a,b,c}, {3, 4, -1}
+        # Allow entries to have subscripts like u_{1}
+        entries = [e.strip() for e in stripped.split(',')]
+        if all(
+            re.match(r'^-?[\dA-Za-z](?:_\{?[^{}]*\}?)?$', e)
+            for e in entries
+            if e
+        ):
+            return True
+        return False
+
+    # Process character by character to handle nested braces properly.
+    # Find top-level { ... } pairs and check if they're set notation.
+    result = []
+    i = 0
+    while i < len(text):
+        if text[i] == '{':
+            # Check what's before: is this a LaTeX command brace?
+            # Look backwards for \command, _, or ^
+            before = text[:i]
+            is_cmd_brace = False
+            # Preceded by \command (backslash + letters) — but NOT
+            # math operators like \in, \leq, \to, etc. which don't
+            # take brace arguments (the { after them is set notation).
+            _MATH_OPS_NO_ARG = {
+                'in', 'notin', 'ni', 'leq', 'geq', 'neq', 'subset',
+                'supset', 'subseteq', 'supseteq', 'cup', 'cap',
+                'to', 'mapsto', 'cdot', 'times', 'div', 'pm', 'mp',
+                'oplus', 'otimes', 'equiv', 'approx', 'sim', 'cong',
+                'Rightarrow', 'Leftarrow', 'Leftrightarrow',
+                'forall', 'exists', 'perp', 'parallel',
+                'alpha', 'beta', 'gamma', 'delta', 'epsilon',
+                'varepsilon', 'zeta', 'eta', 'theta', 'iota',
+                'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho',
+                'sigma', 'tau', 'upsilon', 'varphi', 'phi', 'chi',
+                'psi', 'omega', 'Gamma', 'Delta', 'Theta', 'Lambda',
+                'Xi', 'Pi', 'Sigma', 'Phi', 'Psi', 'Omega',
+                'infty', 'emptyset', 'partial', 'nabla',
+                'ldots', 'cdots', 'vdots', 'ddots',
+                'quad', 'qquad',
+            }
+            cmd_match = re.search(r'\\([a-zA-Z]+)\s*$', before)
+            if cmd_match and cmd_match.group(1) not in _MATH_OPS_NO_ARG:
+                is_cmd_brace = True
+            # Preceded by _ or ^ (subscript/superscript)
+            elif before and before[-1] in '_^':
+                is_cmd_brace = True
+            # Preceded by } — likely second arg of \frac{}{}, \binom{}{}, etc.
+            elif before and before.rstrip()[-1:] == '}':
+                is_cmd_brace = True
+            # Preceded by another \ (like \\{)
+            elif before.endswith('\\'):
+                is_cmd_brace = True
+
+            if is_cmd_brace:
+                result.append('{')
+                i += 1
+                continue
+
+            # Find matching closing brace (handle nesting)
+            depth = 1
+            j = i + 1
+            while j < len(text) and depth > 0:
+                if text[j] == '{' and (j == 0 or text[j-1] != '\\'):
+                    depth += 1
+                elif text[j] == '}' and (j == 0 or text[j-1] != '\\'):
+                    depth -= 1
+                j += 1
+
+            if depth == 0:
+                content = text[i+1:j-1]
+                if _is_set_content(content):
+                    result.append('\\{')
+                    result.append(content)
+                    result.append('\\}')
+                    i = j
+                    continue
+
+            # Not set notation — keep as-is
+            result.append('{')
+            i += 1
+        else:
+            result.append(text[i])
+            i += 1
+
+    return ''.join(result)
+
+
+def _wrap_continuation_math_lines(text: str) -> str:
+    r"""Wrap lines that are purely continuation math (start with = + - etc.)
+    in $...$ delimiters.
+
+    Catches patterns like:
+        = (3-\lambda)[(2-\lambda)(1-\lambda) - 6]
+        = 3[-4m^3 - 9n^2] + ...
+    """
+    def _wrap_line(m: re.Match) -> str:
+        prefix = m.group(1)   # leading whitespace
+        content = m.group(2)  # the math line
+        # Only wrap if it contains math-like content
+        if _has_math_trigger(content) or re.search(r'[\\^_{}()\[\]]', content):
+            return prefix + '$' + content.strip() + '$'
+        # Also wrap if it's a continuation with operators and numbers/variables
+        stripped = content.strip()
+        text_only = re.sub(r'\\[a-zA-Z]+(?:\{[^}]*\})?', '', stripped)
+        if not re.search(r'[A-Za-z]{3,}', text_only):
+            return prefix + '$' + stripped + '$'
+        return m.group(0)
+
+    # Match lines that start with optional whitespace then = + - (math continuation)
+    result = re.sub(
+        r'^([ \t]*)(=[^=\n].*?)$',  # line starting with = (not ==)
+        _wrap_line,
+        text,
+        flags=re.MULTILINE,
+    )
+    return result
+
+
 def _wrap_bare_math(text: str) -> str:
     """Find undelimited math expressions in *text* and wrap them in $...$,
     while leaving already-delimited math untouched.
@@ -577,6 +731,10 @@ def _wrap_bare_math(text: str) -> str:
     Each pattern step re-splits the text so that earlier $…$ insertions
     are respected by later patterns.
     """
+    # Step 0: Escape set-notation braces before any math wrapping
+    text = _escape_set_braces(text)
+    # Step 0b: Wrap continuation math lines (= ..., + ..., etc.)
+    text = _wrap_continuation_math_lines(text)
     # Step 1: Subscripts & superscripts  (D_n, x^2, \chi_{1}(\lambda), …)
     text = _apply_to_non_math(text, _pattern_subscript_superscript)
     # Step 2: Standalone math nouns       (\lambda, \mathbb{R}, \infty, …)
@@ -698,6 +856,7 @@ def text_to_latex(text: str) -> str:
     result = result.replace("#", r"\#")
     # & outside of math or tabular — escape only bare &
     result = re.sub(r"(?<!\\)&", r"\\&", result)
+
 
     # ── Convert Markdown formatting to LaTeX equivalents ──
     result = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", result)
