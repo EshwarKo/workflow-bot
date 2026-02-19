@@ -1,0 +1,2309 @@
+\documentclass[11pt, a4paper]{article}
+
+% ── Encoding & fonts ────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Mathematics ─────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm, amsfonts, mathtools}
+
+% ── Layout ──────────────────────────────────────────────
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[shortlabels]{enumitem}
+\usepackage{parskip}
+
+% ── Colours & boxes ─────────────────────────────────────
+\usepackage[dvipsnames]{xcolor}
+\usepackage[breakable, skins]{tcolorbox}
+\usepackage{hyperref}
+
+\definecolor{accent}{HTML}{1a3a5c}
+\definecolor{accentlight}{HTML}{e8f0f8}
+\definecolor{passgreen}{HTML}{1a7a3a}
+\definecolor{passgreenlight}{HTML}{e6f5ec}
+\definecolor{warnamber}{HTML}{8a6d00}
+\definecolor{warnamberlight}{HTML}{fff8e1}
+\definecolor{failred}{HTML}{a82020}
+\definecolor{failredlight}{HTML}{fde8e8}
+\definecolor{lightgrey}{HTML}{f5f5f5}
+\definecolor{graylight}{HTML}{f0f0f0}
+
+% ── tcolorbox styles ───────────────────────────────────
+\newtcolorbox{problembox}{
+  colback=accentlight, colframe=accent,
+  fontupper=\itshape, breakable,
+  left=6pt, right=6pt, top=6pt, bottom=6pt,
+  boxrule=0.6pt,
+}
+
+\newtcolorbox{hintone}{
+  colback=passgreenlight, colframe=passgreen, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{passgreen},
+  title={\small\sffamily\bfseries\textsc{Tier 1 --- Conceptual Nudge}},
+  fonttitle=\color{passgreen},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=passgreenlight, colframe=passgreenlight},
+}
+
+\newtcolorbox{hinttwo}{
+  colback=warnamberlight, colframe=warnamber, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{warnamber},
+  title={\small\sffamily\bfseries\textsc{Tier 2 --- The Tool}},
+  fonttitle=\color{warnamber},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=warnamberlight, colframe=warnamberlight},
+}
+
+\newtcolorbox{hintthree}{
+  colback=accentlight, colframe=accent, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0pt,
+  borderline west={2.5pt}{0pt}{accent},
+  title={\small\sffamily\bfseries\textsc{Tier 3 --- Outline}},
+  fonttitle=\color{accent},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=accentlight, colframe=accentlight},
+}
+
+\newtcolorbox{insightbox}[1][]{
+  colback=white, colframe=accent!40, breakable,
+  left=5pt, right=5pt, top=4pt, bottom=4pt, boxrule=0.5pt,
+  fonttitle=\small\sffamily\bfseries\color{accent},
+  title={#1},
+}
+
+\newtcolorbox{postmortembox}{
+  colback=lightgrey, colframe=gray!50, breakable,
+  left=6pt, right=6pt, top=6pt, bottom=6pt, boxrule=0.5pt,
+}
+
+\newtcolorbox{stepbox}{
+  colback=blue!2, colframe=accent, breakable,
+  left=5pt, right=5pt, top=3pt, bottom=3pt,
+  boxrule=0pt, borderline west={2.5pt}{0pt}{accent},
+}
+
+% ── Headers / footers ──────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{accent}{\textit{Functional Analysis}}}
+\fancyhead[R]{\small\textcolor{accent}{\textit{Problem Sheet 5356765}}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ── Section formatting ─────────────────────────────────
+\titleformat{\section}
+  {\Large\bfseries\color{accent}}{}{0pt}{}
+  [\vspace{-0.4em}\textcolor{accent}{\rule{\textwidth}{0.8pt}}]
+\titleformat{\subsection}
+  {\large\bfseries\color{accent}}{}{0pt}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.5em}
+\titlespacing*{\subsection}{0pt}{0.8em}{0.3em}
+
+% ── Custom macros (from course preamble) ───────────────
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\norm}[1]{\|#1\|}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\newcommand{\Banach}{\mathcal{B}}
+
+% ── Common math shortcuts ──────────────────────────────
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\N}{\mathbb{N}}
+\providecommand{\Z}{\mathbb{Z}}
+\providecommand{\Q}{\mathbb{Q}}
+\providecommand{\C}{\mathbb{C}}
+\providecommand{\F}{\mathbb{F}}
+% Operator names (safe even if already defined)
+\providecommand{\rank}{\operatorname{rank}}
+\providecommand{\nullity}{\operatorname{nullity}}
+\providecommand{\Span}{\operatorname{span}}
+\renewcommand{\Im}{\operatorname{Im}}
+\providecommand{\tr}{\operatorname{tr}}
+\providecommand{\diag}{\operatorname{diag}}
+\providecommand{\adj}{\operatorname{adj}}
+\providecommand{\sgn}{\operatorname{sgn}}
+\providecommand{\norm}[1]{\left\|#1\right\|}
+\providecommand{\abs}[1]{\left|#1\right|}
+\providecommand{\inner}[2]{\langle #1,\, #2 \rangle}
+
+\begin{document}
+
+% ═══════════════════ TITLE PAGE ═══════════════════════
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+
+{\Huge\bfseries\color{accent} Functional Analysis}
+
+\vspace{0.5cm}
+{\color{accent}\rule{0.6\textwidth}{1.5pt}}
+\vspace{0.5cm}
+
+{\Large\color{gray} Problem Sheet 5356765}
+
+\vspace{2cm}
+
+\begin{tabular}{r l}
+\textcolor{accent}{\textbf{Problems}} & 5 \\[4pt]
+\textcolor{accent}{\textbf{Verified}} & 2 passed, 2 flagged, 1 rejected \\[4pt]
+\textcolor{accent}{\textbf{Generated by}} & MathPipe \\
+\end{tabular}
+
+\vfill
+{\small\color{gray} Compiled 19 February 2026}
+\end{titlepage}
+
+% ═══════════════════ PROBLEMS ═════════════════════════
+
+
+
+
+
+
+
+
+\clearpage
+% ─── Problem 1 ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem 1%
+    \hfill
+    \small\colorbox{warnamberlight}{\textcolor{warnamber}{\textsf{Flagged (72\%)}}}%
+  }%
+}
+\vspace{0.4em}
+
+% Problem statement
+
+\begin{problembox}
+Evaluate the \(n \times n\) determinant
+\[
+\left|\begin{array}{cccccc}
+2 & -1 & 0 & 0 & \cdots & 0 \\
+-1 & 2 & -1 & 0 & \cdots & 0 \\
+0 & -1 & 2 & -1 & \ddots & \vdots \\
+0 & 0 & -1 & \ddots & \ddots & 0 \\
+\vdots & \vdots & \ddots & \ddots & 2 & -1 \\
+0 & 0 & \cdots & 0 & -1 & 2
+\end{array}\right| .
+\]
+\end{problembox}
+
+
+% Classification
+
+
+\subsection*{Classification}
+
+\textbf{recurrence relation}%
+
+\enspace$|$\enspace Also: cofactor expansion, induction, eigenvalue computation%
+
+
+\enspace$|$\enspace Confidence: 95\%%
+
+
+
+
+{\small\color{gray} This is a tridiagonal determinant problem. The most natural approach is to set up a recurrence relation using cofactor expansion along the first row or column. The tridiagonal structure makes this particularly clean. Alternative approaches include direct eigenvalue computation (this matrix is related to the discrete Laplacian) or proof by induction after guessing the pattern.}
+
+
+
+% Hints
+
+
+
+\subsection*{Hints}
+
+
+\begin{hintone}
+When you have a matrix with a lot of structure (many zeros, repeated pattern), think about how computing the determinant for size n might relate to computing it for smaller sizes. The tridiagonal structure means most cofactors will be simple.
+\end{hintone}
+\vspace{0.3em}
+
+
+\begin{hinttwo}
+Use cofactor expansion along the first row (Theorem linalg\_ii\_ht2026.ch2.thm.1). Because of the zeros, only the first two terms will contribute. The first cofactor will give you $D_{n-1}$, but what about the second? Look carefully at the structure of that minor - it's almost tridiagonal but has a special form. This should give you a recurrence relation  D_n  = a \cdot   D_{n-1}  + $b \cdot D_{n-2}$.
+\end{hinttwo}
+\vspace{0.3em}
+
+
+\begin{hintthree}
+Let $D_n$ be the determinant. Expanding along the first row:  D_n  = 2 \cdot   C_{11}  + (-1) \cdot   C_{12} , where  C_{11}  corresponds to deleting row 1 and column 1 (giving  D_{n-1} ), and  C_{12}  corresponds to deleting row 1 and column 2. For the second cofactor, the resulting matrix has a special structure: the (1,1) entry is -1, and the rest is (n-2) \times (n-2) tridiagonal. Expand along the first column of this to get  D_{n-2} . This yields  D_n = 2D_{n-1} - D_{n-2} . Compute  D_1  = 2,  D_2  = 3. The recurrence has characteristic equation  r^{2}  - 2r + 1 = 0, giving  r = 1  (double root). For a double root, the general solution is  D_n  = (A + Bn) \cdot 1^n  = A + Bn. Using initial conditions:  D_1  = A +  B = 2  and  D_2  = A + 2B = 3 gives  B = 1  and  A = 1 . Therefore $D_n = n + 1$.
+\end{hintthree}
+
+
+
+
+
+
+
+
+% Solution (recommended strategy)
+
+
+\subsection*{Solution: Recurrence relation via cofactor expansion}
+
+
+{\small\color{gray} Strategy confidence: 95\%}
+\medskip
+
+
+
+Let $D_n$ denote the determinant of the  n \times n  tridiagonal matrix with 2 on the diagonal and -1 on the super- and sub-diagonals.
+
+\textbf{Step 1: Base cases}
+For  n = 1 :  D_1  = |2| = 2.
+For  n = 2 :  D_2  = |2 -1| =  2 \cdot 2  - (-1) \cdot(-1) = 4  - 1 = 3.
+ |-1 2|
+
+\textbf{Step 2: Recurrence relation}
+For  n \geq 3 , expand det along the first row using cofactor expansion:
+ D_n  = 2 \cdot   C_{11}  + (-1) \cdot   C_{12}  + 0 \cdot   C_{13}  + ... + 0 \cdot   C_{1n} 
+
+where  C_{1j} = (-1)^{1+j}  det( A_{1j} ) is the (1,j)-cofactor.
+
+For  C_{11} : deleting row 1 and column 1 leaves the (n-1) \times (n-1) tridiagonal matrix of the same form, so  C_{11}  = (+1) \cdot   D_{n-1} .
+
+For  C_{12} : deleting row 1 and column 2 leaves an (n-1) \times (n-1) matrix of the form:
+|-1 0 0 ... 0 |
+|-1 2 -1 ... 0 |
+| 0 -1 2 ... 0 |
+| $\vdots \vdots \vdots \ddots \vdots$ |
+| 0 0 0 ... 2 |
+
+Expanding this along the first column:
+det( A_{12} ) = (-1) \cdot   M_{11}  + (-1) \cdot   M_{21}  = (-1) \cdot   D_{n-2}  + (-1) \cdot 0 = - D_{n-2} 
+
+where  M_{11}  is the minor obtained by deleting row 1 and column 1 from  A_{12} , which gives the (n-2) \times (n-2) tridiagonal matrix, hence has determinant  D_{n-2} . The entry  M_{21}  contributes 0 because the matrix remaining has a zero row.
+
+Therefore  C_{12} = (-1)^{1+2} \cdot (- D_{n-2} ) = (-1) \cdot (- D_{n-2} ) =  D_{n-2} .
+
+Thus:  D_n  = 2 \cdot   D_{n-1}  + (-1) \cdot   D_{n-2} = 2D_{n-1} - D_{n-2} .
+
+\textbf{Step 3: Solve the recurrence}
+The characteristic equation is  r^{2}  - 2r + 1 = 0, which factors as  (r-1)^{2}  = 0.
+This gives a double root  r = 1 .
+
+For a double root, the general solution is  D_n  = (A + Bn) \cdot 1^n  = A + Bn.
+
+Using initial conditions:
+ D_1  = A +  B = 2 D_2  = A + 2B = 3
+
+Subtracting:  B = 1 , so  A = 1 .
+
+\textbf{Step 4: Final answer}
+ D_n  = n + 1.
+
+\textbf{Verification:}
+ D_1  = 1 + 1 = 2 {$\checkmark }
+ D_2  = 2 + 1 = 3 { \checkmark }
+ D_3 = 2 \cdot 3  - 2 = 4 = 3 + 1 { \checkmark$}
+
+Therefore, the $n \times n$ tridiagonal determinant equals \textbf{n + 1}.
+
+
+% Step-by-step breakdown
+
+\subsubsection*{Step-by-step breakdown}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 1.}} Compute base cases $D_1 = 2$ and $D_2 = 3$ directly
+
+
+{\small\color{gray} These provide initial conditions for the recurrence relation and are small enough to compute by hand using the explicit formula for $2 \times 2$ determinants}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.prop.1}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 2.}} Set up recurrence $D_n = 2D_{n-1} - D_{n-2}$ using cofactor expansion along the first row
+
+
+{\small\color{gray} The tridiagonal structure means only the first two entries in row 1 are nonzero, simplifying the expansion significantly. The cofactors correspond to structured submatrices whose determinants can be identified}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.thm.1, linalg_ii_ht2026.ch2.def.4}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 3.}} Identify that $C_{11} = D_{n-1}$ and compute $C_{12}$ by further expansion
+
+
+{\small\color{gray} The (1,1)-cofactor gives an (n-1)$\times$(n-1) matrix of the same tridiagonal form. The (1,2)-cofactor requires careful analysis: expanding along the first column of  A_{12}  reveals the $D_{n-2}$ term}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.def.4}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 4.}} Solve the characteristic equation $r^{2} - 2r + 1 = 0$ to get $r = 1$ (double root)
+
+
+{\small\color{gray} Standard technique for linear recurrence relations with constant coefficients. A double root requires the solution form $D_n = A$ + Bn}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 5.}} Use initial conditions to find $A = 1 , B = 1$, giving $D_n = n + 1$
+
+
+{\small\color{gray} The two initial conditions $D_1 = 2$ and $D_2 = 3$ uniquely determine the two constants A and B in the general solution}
+
+
+\end{stepbox}
+
+
+
+
+
+
+
+
+
+
+% Alternative strategies
+
+\subsection*{Alternative Approaches}
+
+
+
+
+\subsubsection*{Pattern recognition and proof by induction (85\%)}
+
+
+\textbf{Conjecture:} $D_n = n + 1$.
+
+\textbf{Proof by strong induction:}
+
+\textit{Base cases:}
+ D_1  = 2 = 1 + 1 {$\checkmark }
+ D_2  = 3 = 2 + 1 { \checkmark$}
+
+\textit{Inductive hypothesis:} Assume  D_k  = k + 1 for all  1 \leq k  < n.
+
+\textit{Inductive step:} We need to show  D_n  = n + 1.
+
+By cofactor expansion along the first row (as in Strategy 1), we have:
+ D_n = 2D_{n-1} - D_{n-2} 
+
+By the inductive hypothesis:
+ D_{n-1}  = (n-1) + 1 = n
+ D_{n-2}  = (n-2) + 1 = n - 1
+
+Therefore:
+ D_n  = 2n - (n-1) = 2n - n + 1 = n + 1.
+
+By strong induction,  D_n  = n + 1 for all $n \geq 1$.
+
+\textbf{Answer:} The determinant equals \textbf{n + 1}.
+
+
+
+
+\subsubsection*{Eigenvalue approach via matrix diagonalization (70\%)}
+
+
+\textbf{Eigenvalue computation (sketch):}
+
+The $n \times n$ tridiagonal matrix  T_n  with 2 on the diagonal and -1 on the off-diagonals can be shown to have eigenvalues:
+
+$\lambda_k = 2$ - 2cos(k$\pi$/(n+1)) for  k = 1 , 2, ..., n.
+
+This can be verified by checking that the vectors  v_k  with j-th component sin(jk$\pi$/(n+1)) are eigenvectors.
+
+The determinant is the product of eigenvalues:
+det( T_n ) = $\prod_{k=1}^n$ [2 - 2cos(k$\pi /(n+1))] = 2^n \prod_{k=1}^n$ [1 - cos(k$\pi /(n+1))]
+ = 2^n \prod_{k=1}^n 2sin^{2}(k\pi/(2(n+1) ))
+ = 2^{2n} \prod_{k=1}^n sin^{2}(k\pi/(2(n+1)$))
+
+Using the Chebyshev identity:
+$\prod_{k=1}^n$ sin(k$\pi /(n+1)) = (n+1)/ 2^n$
+
+and appropriate manipulation of the double-angle form, we can show:
+
+det($T_n$) = n + 1.
+
+\textbf{Note:} This approach is valid but requires trigonometric identities and eigenvalue theory beyond the provided knowledge base. The recurrence approach (Strategy 1) is more elementary and self-contained.
+
+
+
+
+
+% Verification
+
+
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+
+Structural check & \textcolor{warnamber}{\textsf{WARN}} \\
+
+Adversarial check & \textcolor{warnamber}{\textsf{FLAG}} \\
+
+Consistency check & \textcolor{passgreen}{\textsf{PASS}} \\
+\end{tabular}
+
+
+\smallskip
+{\small The solution correctly identifies the problem as a tridiagonal determinant and successfully uses cofactor expansion (Theorem linalg\_ii\_ht2026.ch2.thm.1) to derive the recurrence relation $D_n = 2D_{n-1} - D_{n-2}$. The base cases  D_1 =2 and  D_2 =3 are computed correctly. However, the solution then invokes the characteristic equation method to solve the recurrence, obtaining the characteristic equation  r^{2} -2r+1=0 with double root  r = 1 , and uses the general solution form $D_n = A$+Bn for double roots. This entire framework for solving recurrences is NOT present in the provided KB. While this is standard undergraduate material and the execution is correct, it represents a significant gap relative to chapter 2 content. The solution is mathematically sound but pedagogically incomplete: a student would need prior knowledge from discrete mathematics to bridge Steps 3 and 5. Confidence reduced to 0.72 due to reliance on external material and minor explanatory error in Step 3.}
+
+
+
+{\small\color{warnamber} $\triangle$ The solution uses recurrence relation theory (characteristic equations, double root solution forms) which is completely absent from the provided knowledge base. While the mathematical reasoning is correct and the final answer $D_n = n + 1$ is right, the solution is incomplete as a chapter 2 exercise because it relies on material from outside the chapter. Additionally, Step 3 contains a minor conceptual error in the explanation, though it arrives at the correct conclusion.}
+
+
+
+% Postmortem
+
+
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+
+\begin{insightbox}[Key Insight]
+The tridiagonal structure creates a beautiful recurrence relation $D_n = 2D_{n-1} - D_{n-2}$. The double root  r = 1  in the characteristic equation indicates that the determinant grows linearly rather than exponentially, giving the simple answer $D_n = n + 1$.
+\end{insightbox}
+
+
+
+\begin{insightbox}[Transferable Technique]
+For determinants with heavy structure (tridiagonal, block matrices, many zeros), immediately think: (1) Can I set up a recurrence relation using cofactor expansion? (2) Which row or column has the most zeros? (3) What do the base cases look like? This strategy works for many structured determinant problems and reduces an $n \times n$ computation to solving a recurrence.
+\end{insightbox}
+
+
+
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+
+  \item \textcolor{failred}{$\bullet$} Incorrectly computing det($A_{12}$) in the cofactor expansion - the matrix after deleting row 1 and column 2 is NOT tridiagonal, it has -1 in two positions in the first column
+
+  \item \textcolor{failred}{$\bullet$} Forgetting that a double root $r = 1$ requires solution form (A + Bn) rather than just A$\cdot 1^n$
+
+  \item \textcolor{failred}{$\bullet$} Computing only $D_1$ as a base case for the recurrence, when you actually need both  D_1  and $D_2$ since the recurrence involves two previous terms
+
+  \item \textcolor{failred}{$\bullet$} Trying to use Gaussian elimination to compute the determinant - possible but more tedious than the recurrence approach
+
+\end{itemize}
+
+
+
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+This matrix is the discrete analogue of the second derivative operator $d^{2} / dx^{2}$. It appears when discretizing differential equations (finite difference methods), in the study of random walks on a line, in graph Laplacians for path graphs, and in quantum mechanics (tight-binding model). The eigenvalue approach reveals that this matrix is intimately connected to Fourier analysis: the eigenvectors are discrete sine functions. The fact that det($T_n$) = n+1 has a probabilistic interpretation: the number of spanning trees of a path graph with n+1 vertices.
+
+
+
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+
+  \item Change the diagonal entries to a different value (say 3 instead of 2) - the recurrence becomes $D_n = 3D_{n-1} - D_{n-2}$
+
+  \item Change the off-diagonal entries to a different value (say -c instead of -1) - gives $D_n = 2D_{n-1} - c^{2} D_{n-2}$
+
+  \item Consider a tridiagonal matrix with varying diagonal entries ($a_1 , a_2$, ..., $a_n$) - leads to a more complex recurrence
+
+  \item Generalize to a pentadiagonal matrix (nonzero on 5 diagonals) - requires a higher-order recurrence relation
+
+  \item Ask for the inverse of this matrix rather than its determinant
+
+\end{itemize}
+
+
+\end{postmortembox}
+
+
+
+
+
+
+
+
+
+
+\clearpage
+% ─── Problem 2 ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem 2%
+    \hfill
+    \small\colorbox{warnamberlight}{\textcolor{warnamber}{\textsf{Flagged (72\%)}}}%
+  }%
+}
+\vspace{0.4em}
+
+% Problem statement
+
+\begin{problembox}
+Let \(J\) be the \(n \times n\) matrix all of whose entries are 1 .\\
+(i) Determine \(\chi_{J}\) and show that there are two eigenvalues, 0 and \(n\).\\
+(ii) Find the corresponding eigenspaces. Is \(J\) diagonalizable?
+\end{problembox}
+
+
+% Classification
+
+
+\subsection*{Classification}
+
+\textbf{direct eigenvalue computation}%
+
+\enspace$|$\enspace Also: rank-nullity argument, geometric interpretation, diagonalizability criterion%
+
+
+\enspace$|$\enspace Confidence: 95\%%
+
+
+
+
+{\small\color{gray} This is a structured matrix with special symmetry. The all-ones matrix has rank 1, which immediately constrains the eigenspace dimensions. The primary approach is direct computation using the definition of eigenvalues and eigenvectors, leveraging the special structure of J. The problem tests understanding of characteristic polynomials, eigenspace dimensions, and the diagonalizability criterion (sum of eigenspace dimensions equals n).}
+
+
+
+% Hints
+
+
+
+\subsection*{Hints}
+
+
+\begin{hintone}
+Think about the range of J: what vectors can J produce as outputs? What is the dimension of this space? This tells you about one eigenvalue immediately. Then think about what happens when you apply J to the all-ones vector.
+\end{hintone}
+\vspace{0.3em}
+
+
+\begin{hinttwo}
+The matrix J has rank 1 because all rows are identical. By the rank-nullity theorem, the kernel (which is the 0-eigenspace) has dimension n-1. For the non-zero eigenvalue, observe that J times the all-ones vector produces a simple output. Use the formula for the characteristic polynomial in terms of eigenvalues.
+\end{hinttwo}
+\vspace{0.3em}
+
+
+\begin{hintthree}
+Write $J = vv^T$ where v =  (1,1,...,1)^T . Then Jv = ( v^T v) v = nv , so n is an eigenvalue with eigenvector v. Since rank(J) = 1, we have nullity(J) = n-1, meaning dim( E_0 ) = n-1. The characteristic polynomial has the form $\chi_J(x)$ = x^(n-1)(x-n) since eigenvalues are 0 (multiplicity n-1) and n (multiplicity 1). For diagonalizability, check that dim( E_0 ) + dim($E_n$) = (n-1) + 1 = n, which equals the size of the matrix.
+\end{hintthree}
+
+
+
+
+
+
+% Solution (recommended strategy)
+
+
+\subsection*{Solution: Direct computation with rank observation}
+
+
+{\small\color{gray} Strategy confidence: 95\%}
+\medskip
+
+
+
+Let $v = (1,1,...,1)^T \in \mathbb{R}^n$ denote the column vector with all entries equal to 1.
+
+Part (i): Finding eigenvalues and characteristic polynomial
+
+First, observe that J can be written as J =  vv^T  (outer product). Each column of J is the vector v.
+
+Finding the eigenvalue n:
+Compute Jv = ( vv^T ) v = v ( v^T v) =  v \cdot n  = nv, since  v^T v = 1  + 1 + ... + 1 = n.
+Therefore, v is an eigenvector with eigenvalue $\lambda = n$.
+
+Finding the eigenvalue 0:
+Observe that J has rank 1, since all rows are identical (each row is (1,1,...,1)). By the rank-nullity theorem, dim(ker J) = n - rank(J) = n - 1.
+
+Since ker(J) = {$x \in \mathbb{R}^n$ : Jx = 0} is precisely the 0-eigenspace  E_0 , we have that 0 is an eigenvalue with geometric multiplicity (dimension of eigenspace) equal to n - 1.
+
+Characteristic polynomial:
+The characteristic polynomial is $\chi_J(x)$ = det(xI - J). Since J has eigenvalues 0 (with algebraic multiplicity at least n-1) and n (with algebraic multiplicity at least 1), and the algebraic multiplicities must sum to n (the degree of $\chi_J$), we conclude:
+
+$\chi_J(x)$ = x^(n-1)(x - n)
+
+This can be verified by expanding: $\chi_J(x) = x^n$ - nx^(n-1), which is a monic polynomial of degree n, as expected.
+
+Part (ii): Finding eigenspaces and checking diagonalizability
+
+Eigenspace  E_n :
+We need to solve Jx = nx, or equivalently (J - nI) x = 0 .
+For x =  (x_1,...,x_n)^T , we have Jx =  (s,s,...,s)^T  where s =  x_1  + ... +  x_n  (the sum of all entries).
+The equation Jx = nx becomes  (s,s,...,s)^T  = n (x_1,...,x_n)^T .
+This gives s =  nx_i  for all i, so  x_1 = x_2  = ... =  x_n  = s/n.
+Therefore, all entries of x must be equal.
+
+ E_n  = span{v} = span{ (1,1,...,1)^T }
+
+Thus dim( E_n ) = 1.
+
+Eigenspace  E_0 :
+We need to solve Jx = 0.
+For x =  (x_1,...,x_n)^T , we have Jx =  (s,s,...,s)^T  where s =  x_1  + ... +  x_n .
+The equation Jx = 0 requires  s = 0 , i.e.,  x_1 + x_2  + ... +  x_n  = 0.
+
+ E_0  = {$x \in \mathbb{R}^n$ :  x_1 + x_2  + ... +  x_n  = 0}
+
+This is a hyperplane through the origin. To find a basis, we can use:
+ e_1 - e_n , e_2 - e_n , ..., e_(n-1) -  e_n 
+
+where  e_i  is the i-th standard basis vector. These are clearly in  E_0  (their coordinates sum to zero) and are linearly independent. Therefore dim( E_0 ) = n - 1.
+
+Diagonalizability:
+For J to be diagonalizable, we need the direct sum of eigenspaces to equal $\mathbb{R}^n$.
+We have dim($E_0 \oplus E_n$) = dim( E_0 ) + dim( E_n ) = (n-1) + 1 = n.
+
+Since this equals the dimension of $\mathbb{R}^n$, and eigenspaces for distinct eigenvalues form a direct sum (by Proposition linalg\_ii\_ht2026.ch3.prop.2), we have:
+
+$\mathbb{R}^n = E_0 \oplus E_n$
+
+Therefore, J is diagonalizable.
+
+Explicitly, J is diagonalizable with diagonal form D = diag(n, 0, 0, ..., 0), achieved by the change of basis consisting of v and any basis for $E_0$.
+
+
+% Step-by-step breakdown
+
+\subsubsection*{Step-by-step breakdown}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 1.}} Express J as outer product $J = vv^T$ where $v = (1,...,1)^T$
+
+
+{\small\color{gray} This representation makes the structure transparent and immediately reveals the range of J}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 2.}} Compute Jv = nv to find that n is an eigenvalue with eigenvector v
+
+
+{\small\color{gray} Direct verification using the outer product form: Jv = $vv^T v = v \cdot$ n}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 3.}} Observe that rank(J) = 1 since all rows are identical
+
+
+{\small\color{gray} All rows equal (1,1,...,1), so the row space is 1-dimensional}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 4.}} Apply rank-nullity: dim(ker J) = n - 1
+
+
+{\small\color{gray} Rank-nullity theorem: dim(domain) = rank + nullity}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 5.}} Conclude that 0 is an eigenvalue with geometric multiplicity n-1
+
+
+{\small\color{gray} The kernel of J equals the 0-eigenspace by definition}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 6.}} Deduce characteristic polynomial: $\chi_J(x)$ = x^(n-1)(x - n)
+
+
+{\small\color{gray} The characteristic polynomial is a monic polynomial of degree n whose roots are the eigenvalues (counted with algebraic multiplicity). Since we have established eigenvalues 0 and n with the required multiplicities summing to n, this must be the characteristic polynomial}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.1}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 7.}} Find $E_n$ = span{ (1,1,...,1)^T } by solving (J - nI)$x = 0$
+
+
+{\small\color{gray} The n-eigenspace consists of all eigenvectors for eigenvalue n plus the zero vector}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 8.}} Find $E_0 = {x : x_1 + ... + x_n = 0$} by solving Jx = 0
+
+
+{\small\color{gray} Since Jx equals $(sum, sum, ..., sum)^T$ where sum = $\Sigma x_i$, the condition Jx = 0 is equivalent to $\Sigma x_i = 0$}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 9.}} Verify diagonalizability: dim($E_0$) + dim($E_n$) = (n-1) + 1 = n
+
+
+{\small\color{gray} A matrix is diagonalizable if and only if the direct sum of its eigenspaces equals the whole space, which occurs if and only if the sum of the dimensions of eigenspaces equals n}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+
+
+
+
+
+
+% Alternative strategies
+
+\subsection*{Alternative Approaches}
+
+
+
+
+\subsubsection*{Direct characteristic polynomial computation (75\%)}
+
+
+Part (i): Computing the characteristic polynomial
+
+We compute $\chi_J(x)$ = det(xI - J).
+
+The matrix xI - J has the form:
+[ x-1 -1 -1 ... -1 ]
+[ -1 x-1 -1 ... -1 ]
+[ -1 -1 x-1 ... -1 ]
+[ $\vdots \vdots \vdots \ddots \vdots$ ]
+[ -1 -1 -1 ... x-1 ]
+
+Perform row operations: Add all rows to the first row. The first row becomes:
+[(x-1) + (n-1)(-1), -1 + (n-1)(-1), ..., -1 + (n-1)(-1)]
+= [x - 1 - n + 1, -n, -n, ..., -n]
+= [x - n, -n, -n, ..., -n]
+
+Factor out from the first row: the first row is -n times [-x-n)/n, 1, 1, ..., 1]. Actually, more cleanly:
+The first row is: (x - n, -n, -n, ..., -n) = common factor approach may not be cleanest.
+
+Alternative: Add rows 2 through n to row 1. Then row 1 becomes:
+(x - 1 + (n-1)(-1), -1 + (n-1)(x-1), ...) -- this is getting complex.
+
+Let me use a cleaner approach via column operations:
+Add all columns to the first column. The first column becomes:
+[(x-1) + (n-1)(-1)] [x - n]
+[ -1 + (n-1)(x-1)] = [ ... ]
+
+Actually, the cleanest approach is to use the fact that for a rank-1 perturbation of a scalar matrix, or to note that we can factor.
+
+Alternative direct approach: Since we know J has eigenvalues 0 and n with multiplicities n-1 and 1 respectively (from Strategy 1), the characteristic polynomial must be:
+
+$\chi_J(x)$ = x^(n-1)(x - n)
+
+This can be verified by computing the trace and determinant:
+\begin{itemize}[nosep]
+  \item tr(J) = n (sum of diagonal entries, all equal to 1)
+  \item det(J) = 0 (since rank(J) = 1 < n)
+\end{itemize}
+
+Expanding $\chi_J(x) = x^(n-1)(x - n) = x^n$ - nx^(n-1), we can verify:
+\begin{itemize}[nosep]
+  \item Coefficient of x^(n-1) is -n = -tr(J) {$\checkmark$} (matches Proposition linalg\_ii\_ht2026.ch3.prop.1.c)
+  \item Constant term is 0 =  (-1)^n  det(J) when n is even, which checks out.
+\end{itemize}
+
+Part (ii) is identical to Strategy 1.
+
+Therefore the eigenvalues are 0 and n, eigenspaces are  E_0  = {x : $\Sigma x_i = 0$} with dim n-1, and  E_n  = span{$(1,...,1)^T$} with dim 1. The matrix J is diagonalizable.
+
+
+
+
+
+% Verification
+
+
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+
+Structural check & \textcolor{warnamber}{\textsf{WARN}} \\
+
+Adversarial check & \textcolor{warnamber}{\textsf{FLAG}} \\
+
+Consistency check & \textcolor{passgreen}{\textsf{PASS}} \\
+\end{tabular}
+
+
+\smallskip
+{\small The solution correctly identifies the eigenvalues (0 and n) and eigenspaces of the all-ones matrix J, and correctly concludes that J is diagonalizable. The core mathematical insights are sound: using the outer product representation $J = vv^T$ to find the n-eigenspace, and observing that J has rank 1 to determine the dimension of the 0-eigenspace. However, there are two structural issues that require attention. First, Step 4 relies on the rank-nullity theorem which is not present in the provided KB for chapters 2, 3, 4, making it an external result that violates the constraint. Second, Step 6 has a logical gap where it derives the characteristic polynomial from geometric multiplicities without first establishing that geometric and algebraic multiplicities coincide. The solution later proves diagonalizability (which implies geometric = algebraic), but the ordering is backwards. These issues do not invalidate the correctness of the final answer, but they represent gaps in the rigor of the argument as presented.}
+
+
+
+{\small\color{warnamber} $\triangle$ Two major issues identified: (1) Use of rank-nullity theorem which is not in the provided KB (step 4), and (2) logical gap in step 6 where the solution conflates geometric and algebraic multiplicities when deriving the characteristic polynomial. While the final answer is correct and the overall approach is sound, the logical ordering needs adjustment and the external theorem usage should be acknowledged or replaced.}
+
+
+
+% Postmortem
+
+
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+
+\begin{insightbox}[Key Insight]
+A rank-1 matrix has exactly one non-zero eigenvalue, and this eigenvalue equals the trace of the matrix. The all-ones matrix J is the simplest example: it has rank 1, trace n, and therefore eigenvalues 0 (multiplicity n-1) and n (multiplicity 1).
+\end{insightbox}
+
+
+
+\begin{insightbox}[Transferable Technique]
+For any rank-1 matrix $A = uv^T$ (outer product), the non-zero eigenvalue can be found by computing Au = ( v^T u)u, so $\lambda = v^T$u and u is the eigenvector. The kernel has dimension n-1 and consists of all vectors orthogonal to $v^T$. This pattern appears throughout linear algebra: low-rank perturbations, projection matrices, and data covariance matrices.
+\end{insightbox}
+
+
+
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+
+  \item \textcolor{failred}{$\bullet$} Attempting to compute det(xI - J) directly without using the structure leads to messy algebra
+
+  \item \textcolor{failred}{$\bullet$} Forgetting to check that geometric multiplicities equal algebraic multiplicities when verifying diagonalizability
+
+  \item \textcolor{failred}{$\bullet$} Stating that J has eigenvalue 1 repeated n times (confusing it with the identity matrix)
+
+  \item \textcolor{failred}{$\bullet$} Incorrectly computing the eigenspace for $\lambda = n$ by forgetting that Jv means 'sum all entries and put that sum in each component'
+
+  \item \textcolor{failred}{$\bullet$} Claiming J is not diagonalizable because 0 is an eigenvalue (zero eigenvalues don't prevent diagonalizability)
+
+  \item \textcolor{failred}{$\bullet$} Writing an incorrect basis for $E_0$, such as forgetting that the coordinates must sum to zero
+
+\end{itemize}
+
+
+
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+The all-ones matrix is the adjacency matrix of the complete graph $K_n$, and its eigenvalues encode important graph properties. The n-eigenspace corresponds to the constant vector field, while the 0-eigenspace consists of 'balanced' vectors (summing to zero). This decomposition $\mathbb{R}^n = E_0 \oplus E_n$ is fundamental in harmonic analysis (constant functions vs. mean-zero functions), statistics (grand mean vs. deviations), and physics (center of mass vs. relative positions). The matrix J/n is an orthogonal projection onto the 1-dimensional space of constant vectors, connecting this problem to the theory of projection operators and least squares. Moreover, J is symmetric with real eigenvalues, serving as an elementary example of the Spectral Theorem, though the theorem isn't needed here since the structure makes everything explicit.
+
+
+
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+
+  \item Consider the matrix $J_k$ where all entries equal k instead of 1. How do the eigenvalues scale?
+
+  \item What are the eigenvalues of J + cI for a constant c?
+
+  \item Consider the $n \times n$ matrix with 1s on and above the diagonal and 0s below. How does this differ from J?
+
+  \item Find the eigenvalues of the matrix with 1s on the diagonal and a on the off-diagonal entries
+
+  \item If J is the $n \times n$ all-ones matrix, what are the eigenvalues of  J^2 ? Of $J^k$?
+
+  \item Generalize to the rank-r matrix that is the sum of r rank-1 matrices $uv^T$ with orthogonal u vectors
+
+\end{itemize}
+
+
+\end{postmortembox}
+
+
+
+
+
+
+
+
+
+
+\clearpage
+% ─── Problem 3 ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem 3%
+    \hfill
+    \small\colorbox{passgreenlight}{\textcolor{passgreen}{\textsf{Verified (88\%)}}}%
+  }%
+}
+\vspace{0.4em}
+
+% Problem statement
+
+\begin{problembox}
+Let \(S: V \rightarrow V\) be a linear map on a vector space \(V\) such that \(S^{2}=I\).\\
+(i) Show that the only possible eigenvalues of \(S\) are 1 and -1 . Let \(U\) denote the 1 eigenspace and \(W\) denote the -1 -eigenspace.\\
+(ii) Suppose that \(v \in V\) and \(v=u+w\) where \(u \in U\) and \(w \in W\). Determine \(u\) and \(w\) in terms of \(v\) and \(S v\).\\
+(iii) Verify that \(u \in U\) and \(w \in W\) for the \(u, w\) found in (ii) and deduce that \(V=U \oplus W\).\\
+(iv) If \(\mathcal{B}_{U}\) and \(\mathcal{B}_{W}\) are bases for \(U, W\) what is the matrix for \(S\) wrt \(\mathcal{B}_{U} \cup \mathcal{B}_{W}\) ?\\
+(v) Let \(V=M_{n \times n}(\mathbb{R})\) and \(S(A)=A^{T}\). Describe \(U\) and \(W\) and find an eigenbasis for \(S\).
+\end{problembox}
+
+
+% Classification
+
+
+\subsection*{Classification}
+
+\textbf{spectral/eigenspace decomposition}%
+
+\enspace$|$\enspace Also: algebraic manipulation with minimal polynomial, direct sum construction, projection operators%
+
+
+\enspace$|$\enspace Confidence: 95\%%
+
+
+
+
+{\small\color{gray} This is a canonical problem about involutions ($S^{2} = I$). The key is recognizing that $S^{2} = I$ constrains eigenvalues via the minimal polynomial, then constructing explicit projection formulas (I+S)/2 and (I-S)/2 to decompose V into eigenspaces. Part (v) applies this theory to the concrete example of matrix transpose.}
+
+
+
+% Hints
+
+
+
+\subsection*{Hints}
+
+
+\begin{hintone}
+The condition $S^{2} = I$ is very restrictive. Think about what happens when you apply S to an eigenvector. How does the relation $S^{2} = I$ constrain the eigenvalue? Once you know all possible eigenvalues, consider how the identity map can be split into two projection operators associated with each eigenvalue.
+\end{hintone}
+\vspace{0.3em}
+
+
+\begin{hinttwo}
+If Sv = $\lambda$ v, then applying S again gives  S^{2} $v = \lambda Sv = \lambda^{2}$v. But  S^{2}  = I, so $v = \lambda^{2}$v, which means $\lambda^{2} = 1$ (since  v \neq 0 ). This forces $\lambda$  \in  {1, -1}. For part (ii), you have two equations:  v = u  + w and Sv = S(u + w) = Su + Sw = u - w (since  u \in U  and  w \in W ). This is a simple  2 \times 2  linear system. For part (v), recall that a matrix satisfies  A^T  = A (symmetric) or $A^T$ = -A (skew-symmetric) to be eigenvectors of transpose.
+\end{hinttwo}
+\vspace{0.3em}
+
+
+\begin{hintthree}
+Part (i): Let $\lambda$ be an eigenvalue with eigenvector v. Then  S^{2} v = S(Sv) = S($\lambda v) = \lambda Sv = \lambda^{2}$v. Since  S^{2}  = I, we have $v = \lambda^{2} v, so (1 - \lambda^{2} ) v = 0$. Since  v \neq 0 , we get $\lambda^{2} = 1$, giving $\lambda = \pm$1. Part (ii): From  v = u  + w and Sv = u - w, add to get 2u = v + Sv, so u = (v + Sv)/2. Subtract to get 2w = v - Sv, so w = (v - Sv)/2. Part (iii): Verify S(u) = S((v + Sv)/2) = (Sv +  S^{2} v)/2 = (Sv + v)/2 = u, so  u \in U . Similarly S(w) = -w. To show  V = U   \oplus  W, note every v can be written as u + w with this formula, and if u +  w = 0  with  u \in U  and  w \in W , then applying S gives u -  w = 0 , so  u = w  = 0. Part (iv): The matrix is block diagonal with an identity block (size dim U) and a negative identity block (size dim W). Part (v): U consists of symmetric matrices A =  A^T  and W consists of skew-symmetric matrices A = - A^T . A basis for U: the n diagonal matrices  E_{ii}  plus the (n choose 2) matrices  E_{ij} + E_{ji}  for  i < j . A basis for W: the (n choose 2) matrices  E_{ij} - E_{ji}  for $i < j$.
+\end{hintthree}
+
+
+
+
+% Solution (recommended strategy)
+
+
+\subsection*{Solution}
+
+
+{\small\color{gray} Strategy confidence: 95\%}
+\medskip
+
+
+
+Part (i): Let $\lambda$ be an eigenvalue of S with corresponding eigenvector  v \neq 0 , so Sv = $\lambda$ v. Applying S to both sides:  S^{2} v = S ($\lambda v) = \lambda Sv = \lambda ( \lambda v) = \lambda^{2}$v. Since  S^{2}  = I by hypothesis, we have Iv = $\lambda^{2}$v, that is, $v = \lambda^{2}$v. Rearranging: ($1 - \lambda^{2} ) v = 0$. Since  v \neq 0  (eigenvectors are nonzero by definition), we must have $1 - \lambda^{2} = 0$, hence $\lambda^{2} = 1$. This gives $\lambda = 1 or \lambda = -1$. Therefore the only possible eigenvalues are 1 and -1.
+
+Part (ii): Suppose  v = u  + w where  u \in U  and  w \in W . Since  u \in U , we have Su = u (u is a 1-eigenvector). Since  w \in W , we have Sw = -w (w is a (-1)-eigenvector). Applying S to the equation  v = u  + w:
+ Sv = S(u + w) = Su + Sw = u + (-w) = u - w.
+Thus we have the system of two equations:
+  v = u  + w
+ Sv = u - w.
+Adding these equations: v + Sv = 2u, so u = (v + Sv)/2.
+Subtracting the second from the first: v - Sv = (u + w) - (u - w) = 2w, so w = (v - Sv)/2.
+
+Part (iii): We verify that u = (v + Sv)/ 2 \in U  and w = (v - Sv)/ 2 \in W .
+
+For u: Apply S to get
+ Su = S((v + Sv)/2) = (Sv +  S^{2} v)/2.
+Since  S^{2}  = I, we have  S^{2} v = Iv  = v, so
+ Su = (Sv + v)/2 = (v + Sv)/2 = u.
+Thus Su = u, which means  u \in U  (u is a 1-eigenvector or  u = 0 ).
+
+For w: Apply S to get
+ Sw = S((v - Sv)/2) = (Sv -  S^{2} v)/2 = (Sv - v)/2 = -(v - Sv)/2 = -w.
+Thus Sw = -w, which means  w \in W  (w is a (-1)-eigenvector or  w = 0 ).
+
+Now we prove  V = U   \oplus  W. We must show:
+(1)  V = U  + W (every vector in V can be written as a sum of elements from U and W).
+(2) $U \cap W$ = {0} (the sum is direct).
+
+For (1): Let  v \in V  be arbitrary. Define u = (v + Sv)/2 and w = (v - Sv)/2. We have just shown that  u \in U  and  w \in W . Moreover, u + w = (v + Sv)/2 + (v - Sv)/2 = 2v/2 = v. Thus every  v \in V  can be written as u + w with  u \in U  and  w \in W , so  V = U  + W.
+
+For (2): Suppose  x \in U   \cap  W. Then  x \in U  means Sx = x, and  x \in W  means Sx = -x. Therefore  x = Sx  = -x, which gives 2x = 0, hence  x = 0 . Thus $U \cap W$ = {0}.
+
+Therefore  V = U   \oplus  W.
+
+Part (iv): Let  B_U  = { u_{1} , ...,  u_k } be a basis for U and  B_W  = { w_{1} , ...,  w_m } be a basis for W. Consider the ordered basis $B = B_U \cup B_W$ = { u_{1} , ...,  u_k , w_{1} , ...,  w_m } for V.
+
+For each  u_i \in B_U , we have  Su_i = u_i  = 1 \cdot   u_i  (so the coefficient of  u_i  is 1 and all other coefficients are 0).
+For each  w_j \in B_W , we have  Sw_j  = - w_j  = -1 \cdot   w_j  (so the coefficient of  w_j  is -1 and all other coefficients are 0).
+
+Therefore the matrix of S with respect to B is
+ [S] _B  = diag(1, 1, ..., 1, -1, -1, ..., -1)
+where there are dim(U) ones followed by dim(W) negative ones. This is a block diagonal matrix:
+ [S] _B  = [ I_k  0 ]
+ [0 - I_m ]
+where  I_k  is the  k \times k  identity matrix and  I_m  is the  m \times m  identity matrix.
+
+Part (v): Here $V = M_{n\times n}(\mathbb{R})$ and S(A) =  A^T  (transpose).
+
+First, note that  S^{2}  = I:  S^{2}(A)  = S(S(A)) = S( A^T ) =  (A^T)^T  = A, so  S^{2}  is the identity map.
+
+U (the 1-eigenspace): These are matrices A such that S(A) = A, that is,  A^T  = A. Thus U is the space of symmetric  n \times n  matrices.
+
+W (the (-1)-eigenspace): These are matrices A such that S(A) = -A, that is,  A^T  = -A. Thus W is the space of skew-symmetric (or antisymmetric)  n \times n  matrices.
+
+Dimension count: dim(U) = n(n+1)/2 (there are n diagonal entries plus (n choose 2) = n(n-1)/2 independent entries above the diagonal). dim(W) = n(n-1)/2 (the diagonal must be zero, and there are (n choose 2) independent entries above the diagonal). Note dim(U) + dim(W) = n(n+1)/2 + n(n-1)/2 =  n^{2} /2 + n/2 +  n^{2} /2 - n/2 =  n^{2}  = dim(V), confirming  V = U   \oplus  W.
+
+An eigenbasis for S: We need a basis  B_U  for U and a basis  B_W  for W.
+
+Basis for U (symmetric matrices):
+\begin{itemize}[nosep]
+  \item The n matrices  E_{ii}  for  1 \leq i   \leq  n (diagonal matrices with a single 1 at position (i,i)).
+  \item The n(n-1)/2 matrices  E_{ij} + E_{ji}  for  1 \leq i < j \leq n  (symmetric matrices with 1 at positions (i,j) and (j,i)).
+\end{itemize}
+
+Basis for W (skew-symmetric matrices):
+\begin{itemize}[nosep]
+  \item The n(n-1)/2 matrices  E_{ij} - E_{ji}  for  1 \leq i < j \leq n  (skew-symmetric matrices with 1 at position (i,j) and -1 at position (j,i)).
+\end{itemize}
+
+Here  E_{ij}  denotes the matrix with a 1 in position (i,j) and 0 elsewhere.
+
+Thus B = { E_{ii}  :  1 \leq i   \leq  n}  \cup  { E_{ij} + E_{ji}  :  1 \leq i < j \leq n }  \cup  { E_{ij} - E_{ji}  : $1 \leq i < j \leq n$} is an eigenbasis for S, with eigenvalue 1 for the first n(n+1)/2 basis elements and eigenvalue -1 for the last n(n-1)/2 basis elements.
+
+
+% Step-by-step breakdown
+
+\subsubsection*{Step-by-step breakdown}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 1.}} Let $\lambda$ be an eigenvalue with eigenvector v. Apply S to Sv = $\lambda$ v to get  S^{2} $v = \lambda^{2}$v.
+
+
+{\small\color{gray} Standard technique: iterate the linear map to see what constraints the hypothesis $S^{2} = I$ imposes on eigenvalues.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.def.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 2.}} Use $S^{2} = I$ to conclude $v = \lambda^{2}$v, hence ($1 - \lambda^{2} ) v = 0$. Since  v \neq 0 , deduce $\lambda^{2} = 1$.
+
+
+{\small\color{gray} Eigenvectors are nonzero by definition, so the coefficient must vanish.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.def.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 3.}} Conclude $\lambda \in$ {1, -1}.
+
+
+{\small\color{gray} $\lambda^{2} = 1$ has exactly two real solutions.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 4.}} For part (ii), write $v = u + w$ and apply S: Sv = Su + Sw = u - w.
+
+
+{\small\color{gray} Use the defining properties of U and W: Su = u and Sw = -w.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.def.2, linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 5.}} Solve the $2 \times 2$ system {$v = u + w$, Sv = u - w} by addition and subtraction to get u = (v + Sv)/2 and w = (v - Sv)/2.
+
+
+{\small\color{gray} Standard linear algebra: solve for u and w in terms of v and Sv.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 6.}} Verify S(u) = S((v + Sv)/2) = (Sv + $S^{2} v)/2 = (Sv + v)/2 = u, so u \in U$.
+
+
+{\small\color{gray} Must check that the formula actually gives an element of the 1-eigenspace.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 7.}} Verify S(w) = S((v - Sv)/2) = (Sv - $S^{2} v)/2 = (Sv - v)/2 = -w, so w \in W$.
+
+
+{\small\color{gray} Must check that the formula actually gives an element of the (-1)-eigenspace.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 8.}} Prove $V = U + W$ by showing every  v \in V  decomposes as  v = u  + w with u = (v + Sv)/ 2 \in U  and w = (v - Sv)/$2 \in W$.
+
+
+{\small\color{gray} This shows surjectivity of the map (u, w) $\mapsto$ u + w from $U \times W$ to V.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 9.}} Prove $U \cap W$ = {0} by showing that if  x \in U   \cap  W then Sx = x and Sx = -x, so x = -x, hence $x = 0$.
+
+
+{\small\color{gray} This shows injectivity, establishing that the sum is direct.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 10.}} Conclude $V = U \oplus$ W.
+
+
+{\small\color{gray} Combining surjectivity and injectivity of the decomposition map.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 11.}} For part (iv), note that S acts as the identity on $B_U$ and as -I on  B_W , so [S] _B  = diag( I_k , -$I_m$).
+
+
+{\small\color{gray} The matrix representation with respect to an eigenbasis is diagonal (or block diagonal when eigenspaces are grouped).}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch3.prop.2}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 12.}} For part (v), verify $S^{2}(A) = (A^T)^T = A$, confirming $S^{2} = I$ for the transpose map.
+
+
+{\small\color{gray} Check that the concrete example satisfies the hypothesis.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 13.}} Identify U = {A : $A^T = A$} (symmetric matrices) and W = {A : $A^T$ = -A} (skew-symmetric matrices).
+
+
+{\small\color{gray} Direct translation of eigenspace definitions to the transpose operation.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 14.}} Construct explicit basis for U using $E_{ii}$ (diagonal) and $E_{ij} + E_{ji}$ (off-diagonal symmetric).
+
+
+{\small\color{gray} Standard basis for symmetric matrices derived from elementary matrices.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 15.}} Construct explicit basis for W using $E_{ij} - E_{ji}$ (off-diagonal skew-symmetric).
+
+
+{\small\color{gray} Standard basis for skew-symmetric matrices (diagonal entries must be zero).}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 16.}} Verify dimension count: dim(U) = n(n+1)/2, dim(W) = n(n-1)/2, sum equals $n^{2}$.
+
+
+{\small\color{gray} Consistency check that eigenspaces span the whole space.}
+
+
+\end{stepbox}
+
+
+
+
+
+
+% Alternative strategies
+
+
+% Verification
+
+
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+
+Structural check & \textcolor{passgreen}{\textsf{PASS}} \\
+
+Adversarial check & \textcolor{passgreen}{\textsf{PASS}} \\
+
+Consistency check & \textcolor{passgreen}{\textsf{PASS}} \\
+\end{tabular}
+
+
+\smallskip
+{\small The solution is mathematically correct and complete. All five parts of the problem are properly addressed. Part (i) correctly establishes that eigenvalues are restricted to {1, -1} using the constraint $S^{2} = I$. Parts (ii)-(iii) correctly derive the projection formulas u = (v+Sv)/2 and w = (v-Sv)/2, verify they define elements of the respective eigenspaces, and establish  V = U   \oplus  W. Part (iv) correctly identifies the block diagonal matrix representation. Part (v) provides a complete and correct analysis of the transpose operator, identifying symmetric and skew-symmetric matrices as the eigenspaces and constructing explicit bases with correct dimension counting. The solution has minor presentation issues: (1) the ordering of parts (ii) and (iii) creates an appearance of circularity that could be avoided with clearer conditional phrasing, and (2) the characteristic-2 subtlety in proving $U \cap W$ = {0} is acknowledged but not critical given the real number context. All theorem references are valid, all algebraic manipulations check out, and the projection operator technique is correctly applied. The basis construction in part (v) is verified to be linearly independent and spanning. Confidence: 0.88 (high confidence, with minor deduction for presentation clarity rather than mathematical correctness).}
+
+
+
+
+% Postmortem
+
+
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+
+\begin{insightbox}[Key Insight]
+An involution ($S^{2} = I$) always splits a vector space into $the \pm 1$ eigenspaces via the projection operators  P_{+}  = (I + S)/2 and  P_{-}  = (I - S)/2. These projections are complementary ( P_{+} + P_{-}  = I) and orthogonal ( P_{+} P_{-}  = 0), giving  V = U   \oplus  W automatically. The constraint $S^{2} = I$ is equivalent to saying the minimal polynomial of S divides (t-1)(t+1), which forces the eigenvalue-based decomposition.
+\end{insightbox}
+
+
+
+\begin{insightbox}[Transferable Technique]
+When you have a linear map satisfying a polynomial relation (here $S^{2} = I, i.e., S^{2} - I = 0$), factor that polynomial over the base field to identify potential eigenvalues. Then construct projection operators for each eigenvalue using Lagrange interpolation or direct algebraic manipulation. For an involution, the projections are simply ( I \pm S )/2. This technique generalizes to any polynomial: if p(S) = 0 and p factors as ($S - \lambda_{1} I) \cdot \cdot \cdot (S - \lambda_{k}$I), the space decomposes into generalized eigenspaces.
+\end{insightbox}
+
+
+
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+
+  \item \textcolor{failred}{$\bullet$} Forgetting that eigenvectors are nonzero by definition---the equation ($1 - \lambda^{2} ) v = 0$ does not imply $\lambda = \pm$1 unless $v \neq 0$.
+
+  \item \textcolor{failred}{$\bullet$} Trying to prove $V = U \oplus$ W before having explicit formulas for the decomposition. The formulas u = (v + Sv)/2 and w = (v - Sv)/2 are essential---they construct the projections.
+
+  \item \textcolor{failred}{$\bullet$} In part (v), confusing the basis vectors. The basis for skew-symmetric matrices has NO diagonal elements (since $A_{ii} = - A_{ii}$ implies $A_{ii} = 0$). Students often mistakenly include diagonal matrices in W.
+
+  \item \textcolor{failred}{$\bullet$} Thinking that S must be diagonalizable. In fact, the condition $S^{2} = I$ guarantees diagonalizability over any field where  t^{2}  - 1 splits (e.g., $\mathbb{R}$ or $\mathbb{C}$), because S satisfies a polynomial with distinct roots. But this isn't obvious and should be noted.
+
+  \item \textcolor{failred}{$\bullet$} Circular reasoning in parts (ii) and (iii). The formulas in (ii) both DEFINE and VERIFY the decomposition. The logic must be clear: assume $v = u + w$ exists, derive formulas, then use those formulas to prove existence and uniqueness.
+
+\end{itemize}
+
+
+
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+This problem illustrates the general theory of diagonalization and the spectral theorem. When $S^{2} = I$, we have a polynomial relation that splits completely over $\mathbb{R}$ (unlike, say,  S^{2}  = -I which requires $\mathbb{C}$). The decomposition  V = U   \oplus  W is a special case of the general result: if S satisfies p(S) = 0 where p factors into distinct linear factors, then V decomposes into a direct sum of eigenspaces. The projection operators ( I \pm S )/2 are instances of spectral projections. In part (v), the transpose operator's eigenspaces (symmetric vs skew-symmetric) are fundamental in differential geometry (where they correspond to different types of 2-forms) and in Lie theory (where the Lie algebra of orthogonal matrices consists of skew-symmetric matrices). The dimension count n(n+1)/2 + n(n-1)/$2 = n^{2}$ foreshadows similar decompositions in representation theory. The technique of solving for projection operators via linear systems (part ii) is a discrete version of functional calculus for operators.
+
+
+
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+
+  \item Replace $S^{2} = I$ with  S^{3}  = I (cube roots of unity as eigenvalues, relevant over $\mathbb{C}$ but not $\mathbb{R}$).
+
+  \item Consider $S^{2}$ = -I (no real eigenvalues, but over $\mathbb{C}$ eigenvalues $are \pm i$).
+
+  \item Let T: $V \to V$ satisfy $T^{2} = T$ (idempotent/projection). Show T splits V into ker(T) and im(T) with eigenvalues 0 and 1.
+
+  \item Given S: $V \to V$ with $S^{n} = I$ for some n, describe the eigenvalue structure and eigenspace decomposition.
+
+  \item For the transpose example, compute [S]$_B$ explicitly for  n = 2  or $n = 3$ using the constructed basis and verify it has the block diagonal form.
+
+  \item Consider the map S: $M_{n\times n}(\mathbb{R}) \to M_{n\times n}(\mathbb{R})$ given by S(A) =  A^T  for complex matrices $M_{n\times n}(\mathbb{C})$. How does the eigenspace decomposition change?
+
+\end{itemize}
+
+
+\end{postmortembox}
+
+
+
+
+
+
+
+
+
+
+\clearpage
+% ─── Problem 4 ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem 4%
+    \hfill
+    \small\colorbox{failredlight}{\textcolor{failred}{\textsf{Rejected (20\%)}}}%
+  }%
+}
+\vspace{0.4em}
+
+% Problem statement
+
+\begin{problembox}
+Find the characteristic polynomials of the following matrices. Are any of the matrices similar? [Hint: for no case do you need to construct a change of basis matrix that transforms one matrix into another.]
+\[
+\left(\begin{array}{ccc}
+2 & 6 & 0 \\
+1 & 1 & 0 \\
+1 & -2 & 3
+\end{array}\right), \quad\left(\begin{array}{ccc}
+1 & 0 & 0 \\
+0 & 1 & 0 \\
+0 & 0 & -1
+\end{array}\right), \quad\left(\begin{array}{ccc}
+0 & 1 & 0 \\
+0 & 0 & 1 \\
+-1 & 1 & 1
+\end{array}\right), \quad\left(\begin{array}{ccc}
+-1 & 1 & 1 \\
+0 & 3 & 0 \\
+0 & 0 & 4
+\end{array}\right) .
+\]
+\end{problembox}
+
+
+% Classification
+
+
+\subsection*{Classification}
+
+\textbf{characteristic polynomial computation and similarity invariants}%
+
+\enspace$|$\enspace Also: determinant calculation via cofactor expansion, algebraic invariant comparison%
+
+
+\enspace$|$\enspace Confidence: 95\%%
+
+
+
+
+{\small\color{gray} This is a straightforward computation problem requiring calculation of det($A - \lambda$ I) for each matrix, followed by comparison of similarity invariants (characteristic polynomials, eigenvalues, and their multiplicities) to determine which matrices might be similar. The hint suggests we should use invariants rather than explicit construction.}
+
+
+
+% Hints
+
+
+
+\subsection*{Hints}
+
+
+\begin{hintone}
+The characteristic polynomial is a similarity invariant, meaning similar matrices have the same characteristic polynomial. Computing det($A - \lambda$ I) for each matrix will give you a key piece of information. But be careful: having the same characteristic polynomial doesn't guarantee similarity---you need to check further properties.
+\end{hintone}
+\vspace{0.3em}
+
+
+\begin{hinttwo}
+Use cofactor expansion (KB: linalg\_ii\_ht2026.ch2.thm.1) to compute det($A - \lambda$ I). For triangular or near-triangular matrices, the characteristic polynomial can be read almost immediately from the diagonal. For the first and third matrices, expand along a row or column with zeros. Once you have all four polynomials, compare them: if two matrices have different characteristic polynomials, they cannot be similar. If they have the same polynomial, you need to check whether they have the same Jordan normal form or whether they're both diagonalizable with the same eigenspace dimensions.
+\end{hinttwo}
+\vspace{0.3em}
+
+
+\begin{hintthree}
+Matrix 1: $A - \lambda$ I has a zero in position (1,3), (2,3). Expand along column 3 to get det($A - \lambda I) = (3- \lambda$) det(($2 - \lambda , 6; 1, 1- \lambda$)). The  2 \times 2  determinant is ($2 - \lambda )(1- \lambda ) - 6 = \lambda^{2} - 3 \lambda + 2 - 6 = \lambda^{2} - 3 \lambda - 4 = ( \lambda -4)( \lambda +1). So \chi_{1}(\lambda) = -( \lambda -3)( \lambda -4)( \lambda + 1$).
+
+Matrix 2: Diagonal matrix with diagonal entries 1, 1, -1. Characteristic polynomial is $\chi_{2}(\lambda) = (1- \lambda )(1- \lambda )(-1- \lambda ) = - (1-\lambda)^{2}(1+\lambda)$.
+
+Matrix 3: Expand det($A - \lambda$ I) = det((-$\lambda , 1, 0; 0, - \lambda , 1; -1, 1, 1- \lambda$)) along the first row. You get -$\lambda$ det((-$\lambda , 1; 1, 1- \lambda )) - 1 \cdot det ((0, 1; -1, 1- \lambda )) = - \lambda (- \lambda (1- \lambda ) - 1) - (0 \cdot (1- \lambda ) + 1) = - \lambda (- \lambda + \lambda^{2} - 1) - 1 = \lambda^{2} - \lambda^{3} + \lambda - 1$. Factor: $\chi_{3}(\lambda) = - \lambda^{3} + \lambda^{2} + \lambda - 1 = -( \lambda^{3} - \lambda^{2} - \lambda + 1) = -( \lambda -1)( \lambda^{2} -1) = - (\lambda-1)^{2}(\lambda+1)$.
+
+Matrix 4: Upper triangular, so $\chi_{4}(\lambda) = (-1- \lambda )(3- \lambda )(4- \lambda ) = -(1+ \lambda )(3- \lambda )(4- \lambda$).
+
+Compare: Matrices 2 and 3 have the same characteristic polynomial $\chi ( \lambda ) = - (1-\lambda)^{2}(1+\lambda)$. Check if they're similar: Matrix 2 is diagonal, so if similar, Matrix 3 must also be diagonalizable. Check the geometric multiplicity of eigenvalue 1 in Matrix 3 by finding dim ker($A_{3} - I$). If dim = 2, they're similar; if dim = 1, they have different Jordan forms and are not similar.
+\end{hintthree}
+
+
+
+
+% Solution (recommended strategy)
+
+
+\subsection*{Solution}
+
+
+{\small\color{gray} Strategy confidence: 95\%}
+\medskip
+
+
+
+Let $A_{1} , A_{2} , A_{3} , A_{4}$ denote the four given matrices in order.
+
+\textbf{Matrix 1:}
+ A_{1}  = [[2, 6, 0], [1, 1, 0], [1, -2, 3]]
+
+We compute det($A_{1} - \lambda I): A_{1} - \lambda I = [[2- \lambda , 6, 0], [1, 1- \lambda , 0], [1, -2, 3- \lambda$]]
+
+Expanding along the third column (which has two zeros), we get:
+det($A_{1} - \lambda I) = (3- \lambda$)  \cdot  det([[$2 - \lambda , 6], [1, 1- \lambda ]])
+ = (3- \lambda )[(2- \lambda )(1- \lambda ) - 6]
+ = (3- \lambda )[2 - 2 \lambda - \lambda + \lambda^{2} - 6]
+ = (3- \lambda )[ \lambda^{2} - 3 \lambda - 4]
+ = (3- \lambda )( \lambda - 4)( \lambda + 1)
+
+So \chi_{1}(\lambda) = -( \lambda - 3)( \lambda - 4)( \lambda + 1) = -( \lambda^{3} - 7\lambda^{2} + 7 \lambda + 12$) (expanding to standard form).
+
+Alternatively, in factored form: $\chi_{1}(\lambda)$ has roots $\lambda = 3$, 4, -1 (all distinct).
+
+\textbf{Matrix 2:}
+ A_{2}  = [[1, 0, 0], [0, 1, 0], [0, 0, -1]]
+
+This is diagonal, so:
+$\chi_{2}(\lambda) = (1 - \lambda )(1 - \lambda )(-1 - \lambda ) = (1 - \lambda)^{2}(-1 - \lambda)$
+
+Roots: $\lambda = 1$ (multiplicity 2), $\lambda = -1$ (multiplicity 1).
+
+\textbf{Matrix 3:}
+ A_{3}  = [[0, 1, 0], [0, 0, 1], [-1, 1, 1]]
+
+We compute:
+$A_{3} - \lambda I = [[- \lambda , 1, 0], [0, - \lambda , 1], [-1, 1, 1- \lambda$]]
+
+Expanding along the first row:
+det($A_{3} - \lambda I) = - \lambda$  \cdot  det([[-$\lambda , 1], [1, 1- \lambda ]]) - 1 \cdot det ([[0, 1], [-1, 1- \lambda$]]) + 0
+
+det([[-$\lambda , 1], [1, 1- \lambda ]]) = - \lambda (1- \lambda ) - 1 = - \lambda + \lambda^{2} - 1 = \lambda^{2} - \lambda - 1$
+
+det([[0, 1], [-1, $1 - \lambda ]]) = 0 \cdot (1- \lambda ) - 1\cdot(-1) = 1$
+
+So: det($A_{3} - \lambda I) = - \lambda ( \lambda^{2} - \lambda - 1) - 1 = - \lambda^{3} + \lambda^{2} + \lambda - 1$
+
+Factoring: -$\lambda^{3} + \lambda^{2} + \lambda - 1 = -( \lambda^{3} - \lambda^{2} - \lambda + 1) = -( \lambda^{2}(\lambda - 1) - ( \lambda - 1)) = -( \lambda - 1)( \lambda^{2} - 1) = -( \lambda - 1)( \lambda - 1)( \lambda + 1) = - (\lambda - 1)^{2}(\lambda + 1)$
+
+So $\chi_{3}(\lambda) = - (\lambda - 1)^{2}(\lambda + 1)$.
+
+Roots: $\lambda = 1$ (multiplicity 2), $\lambda = -1$ (multiplicity 1).
+
+\textbf{Matrix 4:}
+ A_{4}  = [[-1, 1, 1], [0, 3, 0], [0, 0, 4]]
+
+This is upper triangular, so the characteristic polynomial is the product of (diagonal entry - $\lambda ): \chi_{4}(\lambda) = (-1 - \lambda )(3 - \lambda )(4 - \lambda$)
+
+Roots: $\lambda = -1$, 3, 4 (all distinct).
+
+\textbf{Comparison:}
+\begin{itemize}[nosep]
+  \item $\chi_{1}(\lambda)$ has roots {3, 4, -1} (all distinct)
+  \item $\chi_{2}(\lambda) = - (1 - \lambda)^{2}(1 + \lambda)$ has roots {1, 1, -1}
+  \item $\chi_{3}(\lambda) = - (1 - \lambda)^{2}(1 + \lambda)$ has roots {1, 1, -1}
+  \item $\chi_{4}(\lambda)$ has roots {-1, 3, 4} (all distinct)
+\end{itemize}
+
+Matrices  A_{2}  and  A_{3}  have the same characteristic polynomial! This is necessary but not sufficient for similarity.
+
+\textbf{Testing similarity of  A_{2}  and  A_{3} :}
+
+Since  A_{2}  is diagonal (hence diagonalizable), if  A_{2}  and  A_{3}  are similar, then  A_{3}  must also be diagonalizable. A matrix is diagonalizable if and only if for each eigenvalue, its geometric multiplicity equals its algebraic multiplicity.
+
+For  A_{3} :
+\begin{itemize}[nosep]
+  \item Eigenvalue $\lambda = 1$ has algebraic multiplicity 2
+  \item Eigenvalue $\lambda = -1$ has algebraic multiplicity 1
+\end{itemize}
+
+We need to check the geometric multiplicity of $\lambda = 1$, i.e., dim(ker( A_{3}  - I)).
+
+ A_{3}  - I = [[-1, 1, 0], [0, -1, 1], [-1, 1, 0]]
+
+Row reducing:
+[[-1, 1, 0], [0, -1, 1], [-1, 1, 0]]  \to  [[-1, 1, 0], [0, -1, 1], [0, 0, 0]] (subtract row 1 from row 3)
+
+From row 2: -y +  z = 0 , so  z = y .
+From row 1: -x +  y = 0 , so  x = y .
+
+So ker( A_{3}  - I) = {(t, t, t) : $t \in \mathbb{R}$} has dimension 1.
+
+Since the geometric multiplicity (1) is less than the algebraic multiplicity (2) for eigenvalue 1, matrix  A_{3}  is NOT diagonalizable.
+
+Since  A_{2}  is diagonalizable but  A_{3}  is not, they cannot be similar.
+
+\textbf{Conclusion:}
+None of the matrices are similar to each other.
+
+\begin{itemize}[nosep]
+  \item $\chi_{1}(\lambda) = -( \lambda - 3)( \lambda - 4)( \lambda + 1)
+- \chi_{2}(\lambda) = - (\lambda - 1)^{2}(\lambda + 1) - \chi_{3}(\lambda) = - (\lambda - 1)^{2}(\lambda + 1) - \chi_{4}(\lambda) = -( \lambda + 1)( \lambda - 3)( \lambda - 4$)
+\end{itemize}
+
+Matrices  A_{2}  and  A_{3}  have the same characteristic polynomial but different Jordan forms ( A_{2}  has two  1 \times 1  Jordan blocks for eigenvalue 1, while  A_{3}  has one $2 \times 2$ Jordan block for eigenvalue 1), so they are not similar.
+
+No other pair shares the same characteristic polynomial, so no other pairs can be similar.
+
+
+% Step-by-step breakdown
+
+\subsubsection*{Step-by-step breakdown}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 1.}} Compute characteristic polynomial of $A_{1}$ by cofactor expansion along column 3
+
+
+{\small\color{gray} Column 3 has two zeros, making cofactor expansion efficient. The determinant factors as ($3 - \lambda$) times a $2 \times 2$ determinant.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.thm.1}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 2.}} Compute characteristic polynomial of $A_{2}$ by reading off diagonal
+
+
+{\small\color{gray} For diagonal matrices, the characteristic polynomial is the product of (diagonal entry - $\lambda$).}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 3.}} Compute characteristic polynomial of $A_{3}$ by cofactor expansion along row 1
+
+
+{\small\color{gray} Row 1 has a zero in position (1,3), reducing computational complexity. The resulting polynomial can be factored by grouping.}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.thm.1}
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 4.}} Compute characteristic polynomial of $A_{4}$ by reading off diagonal
+
+
+{\small\color{gray} Upper triangular matrices have characteristic polynomial equal to the product of (diagonal entry - $\lambda$).}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 5.}} Compare all four characteristic polynomials
+
+
+{\small\color{gray} Similarity implies equal characteristic polynomials (similarity invariant), so different polynomials rule out similarity.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 6.}} Identify that $A_{2}$ and  A_{3}  have the same characteristic polynomial $\chi ( \lambda ) = - (\lambda-1)^{2}(\lambda+1)$
+
+
+{\small\color{gray} Equal characteristic polynomials are necessary but not sufficient for similarity. We must check further invariants.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 7.}} Check diagonalizability of $A_{3}$ by computing geometric multiplicity of eigenvalue 1
+
+
+{\small\color{gray} $A_{2}$ is diagonal (hence diagonalizable). If $A_{3}$ is also diagonalizable with the same eigenvalues and multiplicities, they are similar. If not, they cannot be similar.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 8.}} Row reduce $A_{3} - I$ to find dim(ker($A_{3} - I$))
+
+
+{\small\color{gray} The geometric multiplicity equals the dimension of the kernel, which equals n - rank($A_{3} - I$).}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 9.}} Conclude that dim(ker($A_{3} - I$)) = 1 < 2 = algebraic multiplicity
+
+
+{\small\color{gray} This proves $A_{3}$ is not diagonalizable, so  A_{3}  has a different Jordan form than $A_{2}$.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 10.}} Conclude that no matrices are similar
+
+
+{\small\color{gray} $A_{1}$ and  A_{4}  have different characteristic polynomials from all others (and from each other after checking roots).  A_{2}  and $A_{3}$ have the same characteristic polynomial but different Jordan normal forms.}
+
+
+\end{stepbox}
+
+
+
+
+
+
+% Alternative strategies
+
+
+% Verification
+
+
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+
+Structural check & \textcolor{warnamber}{\textsf{WARN}} \\
+
+Adversarial check & \textcolor{failred}{\textsf{FAIL}} \\
+
+Consistency check & \textcolor{failred}{\textsf{FAIL}} \\
+\end{tabular}
+
+
+\smallskip
+{\small The solution correctly computes the characteristic polynomial of each matrix using appropriate cofactor expansion techniques. The factorizations are accurate, and the diagonalizability analysis for $A_{2}$ and  A_{3}  is correct (they have the same characteristic polynomial but  A_{3}  is not diagonalizable, so they are not similar). However, the solution contains a critical error: it fails to recognize that  A_{1}  and  A_{4}  have identical characteristic polynomials $\chi_{1}(\lambda) = \chi_{4}(\lambda) = -( \lambda +1)( \lambda -3)( \lambda - 4$). Both matrices have distinct eigenvalues {-1, 3, 4} and are therefore diagonalizable. Since two diagonalizable matrices are similar if and only if they have the same eigenvalues with the same multiplicities,  A_{1}  and  A_{4}  ARE similar. The correct answer is:  A_{1}  and  A_{4}  are similar;  A_{2}  and $A_{3}$ are not similar despite having the same characteristic polynomial. This is a significant conceptual error that undermines the entire conclusion.}
+
+
+
+{\small\color{warnamber} $\triangle$ Critical error in final conclusion: solution incorrectly claims no matrices are similar, when in fact $A_{1}$ and $A_{4}$ are similar (both diagonalizable with eigenvalues -1, 3, 4). The characteristic polynomial computations are correct, but the comparison and similarity analysis is flawed.}
+
+
+
+% Postmortem
+
+
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+
+\begin{insightbox}[Key Insight]
+Having the same characteristic polynomial is necessary but not sufficient for similarity. The characteristic polynomial only captures eigenvalues and their algebraic multiplicities, but similarity also requires matching geometric multiplicities (or equivalently, matching Jordan normal forms). Two matrices can have identical spectra yet differ in their internal eigenspace structure.
+\end{insightbox}
+
+
+
+\begin{insightbox}[Transferable Technique]
+When testing similarity: (1) First compute characteristic polynomials---different polynomials immediately rule out similarity. (2) For matrices with the same polynomial, check finer invariants like diagonalizability or Jordan form. (3) For computational efficiency, exploit special structure: triangular matrices have diagonal entries as eigenvalues; sparse matrices allow strategic cofactor expansion. (4) Remember that diagonalizable matrices are similar if and only if they have the same eigenvalues with the same multiplicities.
+\end{insightbox}
+
+
+
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+
+  \item \textcolor{failred}{$\bullet$} Concluding that $A_{2}$ and $A_{3}$ are similar because they have the same characteristic polynomial, without checking geometric multiplicities or Jordan forms.
+
+  \item \textcolor{failred}{$\bullet$} Making arithmetic errors when expanding det($A - \lambda$ I), especially sign errors in cofactor expansion.
+
+  \item \textcolor{failred}{$\bullet$} Forgetting that upper/lower triangular matrices have their eigenvalues on the diagonal, leading to unnecessary computation.
+
+  \item \textcolor{failred}{$\bullet$} Confusing algebraic multiplicity (power in characteristic polynomial) with geometric multiplicity (dimension of eigenspace).
+
+\end{itemize}
+
+
+
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+This problem illustrates a fundamental theme in linear algebra: the tension between different notions of 'sameness' for matrices. Equality is too strict (depends on basis choice), while having the same determinant is too weak (doesn't capture structure). Similarity is the 'right' equivalence relation for understanding linear transformations as geometric objects independent of coordinates. The characteristic polynomial is the first similarity invariant students encounter, but it's incomplete---the full story requires the Jordan normal form, which completely classifies matrices up to similarity. This connects to representation theory, where understanding objects 'up to isomorphism' is central, and to moduli problems in algebraic geometry, where we classify objects by invariants.
+
+
+
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+
+  \item Modify $A_{3}$ to make it diagonalizable: what is the minimal change to an entry that would increase the geometric multiplicity of eigenvalue 1 to 2?
+
+  \item Find all $3 \times 3$ matrices similar to $A_{2}$ that are not diagonal. (Answer: all matrices with Jordan blocks of sizes 1,1,1 for eigenvalues 1,1,-1.)
+
+  \item Given that $A_{1}$ has distinct eigenvalues, find its Jordan normal form explicitly and describe all matrices similar to $A_{1}$.
+
+  \item Construct a $3 \times 3$ matrix with characteristic polynomial -$(\lambda-1)^{2}(\lambda+1)$ that IS similar to $A_{2}$.
+
+\end{itemize}
+
+
+\end{postmortembox}
+
+
+
+
+
+
+
+
+
+
+\clearpage
+% ─── Problem 5 ───────────────────────────
+\noindent
+\colorbox{accent}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \color{white}\large\bfseries Problem 5%
+    \hfill
+    \small\colorbox{passgreenlight}{\textcolor{passgreen}{\textsf{Verified (85\%)}}}%
+  }%
+}
+\vspace{0.4em}
+
+% Problem statement
+
+\begin{problembox}
+Let \(m, n\) be real numbers and let \(a, b, c\) be the roots of the cubic \(z^{3}+m z+n=0\). The discriminant \(\Delta\) of the cubic is given by
+\[
+\Delta=(a-b)^{2}(a-c)^{2}(b-c)^{2}
+\]
+
+(i) Explain why \(\Delta\) is a real number. What can be said about the roots of the cubic when \(\Delta>0, \Delta=0, \Delta<0\) ?\\
+(ii) By considering the identity \((z-a)(z-b)(z-c)=z^{3}+m z+n\), show that \(a+b+c=0\) and find expressions for \(m\) and \(n\) in terms of \(a, b, c\).\\
+(iii) Let \(S_{k}=a^{k}+b^{k}+c^{k}\) for \(k \geqslant 0\). Find expressions for \(S_{0}, S_{1}, S_{2}\) in terms of \(m, n\).\\
+(iv) Explain why \(S_{k+3}+m S_{k+1}+n S_{k}=0\) for \(k \geqslant 0\) and hence find expressions for \(S_{3}\) and \(S_{4}\) in terms of \(m\) and \(n\).\\
+(v) Write down \(\operatorname{det} A\) where
+
+\[
+A=\left(\begin{array}{lll}
+1 & a & a^{2} \\
+1 & b & b^{2} \\
+1 & c & c^{2}
+\end{array}\right)
+\]
+
+Determine the matrix \(A^{T} A\) and deduce that \(\Delta=-4 m^{3}-27 n^{2}\).
+
+\section*{Starter}
+S1. (i) Show that a square matrix is singular if and only if 0 is an eigenvalue.\\
+(ii) Show that a square matrix has the same eigenvalues as its transpose.\\
+(iii) If \(A\) is an invertible matrix, how are the eigenvalues of \(A^{-1}\) related to those of \(A\) ?
+
+S2. (i) Show that the product of two \(n \times n\) permutation matrices is a permutation matrix.\\
+(ii) Show that the inverse of a permutation matrix is a permutation matrix.\\
+(iii) Show that a permutation matrix is orthogonal.
+
+S3. (Parity is well-defined) Any permutation matrix can be written as a product of transposition matrices \(S_{i j}\). For a given permutation matrix, show that this product always involves an even number of transpositions, or always an odd number. List the even \(3 \times 3\) permutation matrices.
+
+\section*{Pudding}
+P1. Let \(a_{1}, \ldots, a_{n}\) be real numbers. By repeated differentiation, or otherwise, show that each \(a_{i}\) must be zero if
+
+\[
+a_{1} \sin x+a_{2} \sin 2 x+\cdots+a_{n} \sin n x=0 \quad \text { for all real } x .
+\]
+
+P2. Let \(A\) be an \(m \times n\) matrix. A submatrix of \(A\) is any matrix formed by deleting certain rows and columns of \(A\). The determinantal rank of \(A\) is the greatest value of \(r\) such that there is an invertible \(r \times r\) submatrix.\\
+(i) For each matrix below, find its determinantal rank.
+
+\[
+\left(\begin{array}{lll}
+1 & 1 & 1 \\
+2 & 2 & 2 \\
+3 & 3 & 3
+\end{array}\right), \quad\left(\begin{array}{lll}
+1 & 0 & 1 \\
+2 & 1 & 2
+\end{array}\right), \quad\left(\begin{array}{cccc}
+1 & 1 & -1 & 1 \\
+2 & 3 & 0 & 2 \\
+1 & 2 & 1 & 1
+\end{array}\right) .
+\]
+
+(ii) Show that determinantal rank of a matrix equals its rank.
+
+P3. Let \(A=\left(a_{i j}\right)\) be an \(n \times n\) matrix where \(n \geqslant 2\). Show that the adjugate \(\operatorname{adj} A=0\) if and only if \(\operatorname{rank} A \leqslant n-2\). What is the \(\operatorname{rank}\) of \(\operatorname{adj} A\) if \(\operatorname{rank} A=n-1\) ?
+\end{problembox}
+
+
+% Classification
+
+
+\subsection*{Classification}
+
+\textbf{polynomial identities and symmetric functions}%
+
+\enspace$|$\enspace Also: Vandermonde determinant, matrix computation, recurrence relations, complex conjugate properties%
+
+
+\enspace$|$\enspace Confidence: 95\%%
+
+
+
+
+{\small\color{gray} This problem combines classical algebraic techniques (Vieta's formulas, power sum identities) with linear algebraic tools (Vandermonde determinants, matrix products). The discriminant analysis uses properties of polynomials with real coefficients and complex roots. The final computation requires explicit matrix multiplication and determinant properties.}
+
+
+
+% Hints
+
+
+
+\subsection*{Hints}
+
+
+\begin{hintone}
+For part (i), consider what happens to $\Delta$ when roots are complex conjugates versus all real. For the later parts, think about what the coefficients of a polynomial tell you about symmetric functions of its roots. The Vandermonde determinant has a standard formula involving differences of roots.
+\end{hintone}
+\vspace{0.3em}
+
+
+\begin{hinttwo}
+Use Vieta's formulas to relate elementary symmetric functions to coefficients. For the recurrence in part (iv), multiply the equation $a^{k+3} + ma^{k+1} + na^{k} = 0$ by noting each root satisfies the cubic. For part (v), recognize that det A is a Vandermonde determinant with value (b-a)(c-a)(c-b), and compute  A^T  A by expanding the (i,j)-entry as  S_{i+j-2} . The key is that det( A^T  A) = $(det A)^{2} = \Delta$.
+\end{hinttwo}
+\vspace{0.3em}
+
+
+\begin{hintthree}
+Part (i): $\Delta$ is a product of squared terms, so it's real (or note that if complex roots exist, they come in conjugate pairs for real polynomials, making differences conjugate pairs whose product is real). When $\Delta > 0$, all roots are real and distinct; $\Delta = 0$ means repeated roots; $\Delta < 0$ means one real and two complex conjugate roots. Part (ii): Expand (z-a)(z-b)(z-c) =  z^{3} -(a+b+c) z^{2} +(ab+bc+ca)z-abc; matching with  z^{3} +mz+n gives coefficient of  z^{2}  is 0, so a+b+ c = 0 ; also ab+bc+ca=m and abc=-n. Part (iii):  S_{0} =3,  S_{1} =a+b+ c = 0 , S_{2} = a^{2} + b^{2} + c^{2} = (a+b+c)^{2} -2(ab+bc+ca)=0-2m=-2m. Part (iv): Since each root satisfies  a^{k+3} =- ma^{k+1} - na^{k} , sum over roots to get  S_{k+3} =- mS_{k+1} - nS_{k} . Thus  S_{3} =- mS_{1} - nS_{0} =- n \cdot 3 =-3n and  S_{4} =- mS_{2} - nS_{1} =-m(-2m)= 2m^{2} . Part (v): det A = (b-a)(c-a)(c-b) (Vandermonde).  A^T  A has (i,j) entry equal to  S_{i+j-2} . So  A^T  A = [[ S_{0} , S_{1} , S_{2} ], [ S_{1} , S_{2} , S_{3} ], [ S_{2} , S_{3} , S_{4} ]] = [[3, 0, -2m], [0, -2m, -3n], [-2m, -3n,  2m^{2} ]]. Compute det( A^T  A) = $(det A)^{2} = \Delta$. Expanding this  3 \times 3  determinant and setting equal to $\Delta$ yields $\Delta =- 4m^{3} - 27n^{2}$.
+\end{hintthree}
+
+
+
+
+% Solution (recommended strategy)
+
+
+\subsection*{Solution}
+
+
+{\small\color{gray} Strategy confidence: 95\%}
+\medskip
+
+
+
+\textbf{Part (i):} The discriminant $\Delta = (a-b)^{2}(a-c) ^{2} (b-c)^{2}$ is a product of squared terms, hence non-negative if all factors are real. However, for a cubic with real coefficients m and n, if complex roots exist, they must appear as conjugate pairs. Since we have three roots, either all three are real, or one is real and two are complex conjugates.
+
+If all roots are real, then all differences (a-b), (a-c), (b-c) are real, so $\Delta$ is real and non-negative. If a is real and b, c are complex conjugates, write  b = p +qi and  c = p -qi with  q \neq 0 . Then b- c = 2 qi, so |b-c| ^{2} = 4q^{2} . Also, a-b and a-c are conjugates, so (a-b)(a-c) = |a-b| ^{2} . Therefore $\Delta = |a-b| ^{4} \cdot$|a-c| ^{4} \cdot (4q^{2})^{2}  is real. Moreover, we can verify by expanding that $\Delta$ is actually a symmetric polynomial in the roots with real coefficients, hence must be real.
+
+\textbf{Sign interpretation:}
+\begin{itemize}[nosep]
+  \item $\Delta > 0$: All three roots are real and distinct (all pairwise differences nonzero)
+  \item $\Delta = 0$: At least two roots coincide (repeated root)
+  \item $\Delta < 0$: One real root and two complex conjugate roots (the product involves conjugate differences)
+\end{itemize}
+
+\textbf{Part (ii):} Expand the left side of (z-a)(z-b)(z-c):
+
+(z-a)(z-b)(z-c) =  z^{3}  - (a+b+c) z^{2}  + (ab+bc+ca)z - abc
+
+Comparing with  z^{3} +mz+n (noting there is no  z^{2}  term), we get:
+\begin{itemize}[nosep]
+  \item Coefficient of  z^{2} : -(a+b+c) = 0, therefore \textbf{a+b+ c = 0 }
+  \item Coefficient of z: ab+bc+ca = m, therefore \textbf{ m = ab +bc+ca}
+  \item Constant term: -abc = n, therefore \textbf{n = -abc}
+\end{itemize}
+
+\textbf{Part (iii):} 
+\begin{itemize}[nosep]
+  \item  S_{0}  = a+b+c = 1+1+1 = \textbf{3}
+  \item  S_{1}  = a+b+c = \textbf{0} (from part ii)
+  \item  S_{2} = a^{2} + b^{2} + c^{2} 
+\end{itemize}
+
+To find  S_{2} , use the identity  (a+b+c)^{2} = a^{2} + b^{2} + c^{2}  + 2(ab+bc+ca):
+
+0 =  S_{2}  + 2m
+
+Therefore \textbf{ S_{2}  = -2m}.
+
+\textbf{Part (iv):} Each root satisfies the cubic equation. Specifically, for each root r  \in  {a,b,c}:
+
+ r^{3}  + mr +  n = 0 
+
+Multiplying by  r^{k} :
+
+ r^{k+3} + mr^{k+1} + nr^{k}  = 0
+
+Summing over all three roots:
+
+ a^{k+3} + b^{k+3} + c^{k+3}  + m( a^{k+1} + b^{k+1} + c^{k+1} ) + n( a^{k} + b^{k} + c^{k} ) = 0
+
+Therefore \textbf{ S_{k+3} + mS_{k+1} + nS_{k}  = 0} for all  k \geq 0 .
+
+Applying this recurrence:
+
+For  k = 0 :  S_{3} + mS_{1} + nS_{0}  = 0
+ S_{3}  + m(0) + n(3) = 0
+\textbf{ S_{3}  = -3n}
+
+For  k = 1 :  S_{4} + mS_{2} + nS_{1}  = 0
+ S_{4}  + m(-2m) + n(0) = 0
+\textbf{ S_{4} = 2m^{2} }
+
+\textbf{Part (v):} The matrix A is a Vandermonde matrix:
+
+A = [[1, a,  a^{2} ],
+ [1, b,  b^{2} ],
+ [1, c,  c^{2} ]]
+
+The determinant of a Vandermonde matrix with rows corresponding to values a, b, c is:
+
+\textbf{det A = (b-a)(c-a)(c-b)}
+
+Note that det A = -(a-b)(c-a)(c-b) = (a-b)(a-c)(c-b) = (a-b)(c-a)(c-b) up to sign. More carefully:
+
+det A = (b-a)(c-a)(c-b)
+
+Now compute  A^T  A. The (i,j)-entry of  A^T  A is the dot product of the i-th column of  A^T  (which is the i-th row of A) with the j-th column of  A^T  (which is the j-th row of A).
+
+Actually, the (i,j)-entry of  A^T  A equals the sum:  1 \cdot 1 \cdot  a^(i-1) \cdot  b^(j-1) terms. Let me be more careful.
+
+The i-th row of  A^T  is the i-th column of A: [1, 1, 1] for  i = 1 , [a, b, c] for  i = 2 , [ a^{2} , b^{2} , c^{2} ] for  i = 3 .
+The j-th column of  A^T  is the j-th row of  A^T , which is the j-th column of A.
+
+So  (A^T A)_{ij}  = (row i of  A^T ) \cdot (column j of  A^T ) = (column i of A) \cdot (row j of A).
+
+Column i of A (for  i = 1 ,2,3) is [1, 1, 1] ^T , [a, b, c] ^T , [ a^{2} , b^{2} , c^{2} ] ^T .
+Row j of A (for  j = 1 ,2,3) is [1, a,  a^{2} ], [1, b,  b^{2} ], [1, c,  c^{2} ].
+
+Wait, this is getting confusing. Let me compute directly.
+
+$(A^T A)_{ij} = \Sigma_{k} (A^T)_{ik}(A) _{kj} = \Sigma_{k} A_{ki} A_{kj}$
+
+For row  k = 1 ,2,3 and columns i,j:
+Row 1 of A: [1, a,  a^{2} ]
+Row 2 of A: [1, b,  b^{2} ]
+Row 3 of A: [1, c,  c^{2} ]
+
+So  (A^T A)_{ij}  = 1^(i-1) \cdot 1^(j-1) + a^(i-1) \cdot  a^(j-1) + b^(i-1) \cdot  b^(j-1) + c^(i-1) \cdot  c^(j-1) where we index from 1.
+
+Wait, let me index columns of A as 1,2,3 corresponding to powers 0,1,2.
+
+$(A^T A)_{ij} = \Sigma_{k} =1,2,3 [ r_{k} ^(i-1)][ r_{k}$^(j-1)] where  r_{1} =1,  r_{2} =1,  r_{3} =1 for column 1... No, this is wrong.
+
+Let me restart. A has entry  A_{ij}  where i indexes rows (corresponding to roots) and j indexes columns (corresponding to powers).
+
+ A_{11} =1,  A_{12} =a,  A_{13} = a^{2} A_{21} =1,  A_{22} =b,  A_{23} = b^{2} A_{31} =1,  A_{32} =c,  A_{33} = c^{2} 
+
+So  A_{ij} = r_{i} ^(j-1) where  r_{1} =a,  r_{2} =b,  r_{3} =c.
+
+$(A^T A)_{mn} = \Sigma_{i} A_{im} A_{in} = \Sigma_{i} r_{i} ^(m-1)  r_{i} ^(n-1) = \Sigma_{i} r_{i}$^(m+n-2) =  S_{m+n-2} 
+
+Therefore:
+
+ A^T A = [[ S_{0} , S_{1} , S_{2} ],
+ [ S_{1} , S_{2} , S_{3} ],
+ [ S_{2} , S_{3} , S_{4} ]]
+ = [[3, 0, -2m],
+ [0, -2m, -3n],
+ [-2m, -3n,  2m^{2} ]]
+
+Now det( A^T  A) = det( A^T )det(A) = $(det A)^{2}$.
+
+Also, $(det A)^{2} = [(b-a)(c-a)(c-b)] ^{2} = (b-a)^{2}(c-a) ^{2} (c-b)^{2} = (a-b)^{2}(a-c) ^{2} (b-c)^{2} = \Delta$.
+
+So we need to compute det( A^T  A) and set it equal to $\Delta$.
+
+Expanding along the first row:
+
+det( A^T  A) = $3 \cdot det$[[-2m, -3n], [-3n,  2m^{2} ]] - 0 + (-2m) \cdot  det[[0, -3n], [-2m,  2m^{2} ]]
+
+= 3[(-2m)( 2m^{2} ) - (-3n)(-3n)] + (-2m)[0 \cdot 2m^{2}  - (-3n)(-2m)]
+= 3[- 4m^{3} - 9n^{2} ] + (-2m)[-6mn]
+= - 12m^{3} - 27n^{2} + 12m^{2} n
+
+Hmm, this doesn't immediately give - 4m^{3} - 27n^{2} . Let me recalculate.
+
+det[[3, 0, -2m],
+ [0, -2m, -3n],
+ [-2m, -3n,  2m^{2} ]]
+
+Expanding along the first row:
+= $3 \cdot det [[-2m, -3n], [-3n, 2m^{2}$]] - 0 \cdot (...) + (-2m) \cdot  det[[0, -2m], [-2m, -3n]]
+
+= 3 \cdot [(-2m)($2m^{2} ) - (-3n)(-3n)] + (-2m) \cdot [0 \cdot (-3n) - (-2m)(-2m)]
+= 3 \cdot [- 4m^{3} - 9n^{2}$] + (-2m) \cdot [$0 - 4m^{2} ]
+= - 12m^{3} - 27n^{2}$ + (-2m)(- 4m^{2} )
+= - 12m^{3} - 27n^{2} + 8m^{3} 
+= - 4m^{3} - 27n^{2} 
+
+Therefore \textbf{$\Delta = - 4m^{3} - 27n^{2}$}.
+
+
+% Step-by-step breakdown
+
+\subsubsection*{Step-by-step breakdown}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 1.}} Establish that $\Delta$ is real by analyzing the structure of roots for polynomials with real coefficients
+
+
+{\small\color{gray} For real coefficient polynomials, complex roots appear in conjugate pairs. The discriminant is a symmetric polynomial in the roots with integer coefficients, hence must be real when the polynomial has real coefficients.}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 2.}} Expand (z-a)(z-b)(z-c) and compare coefficients with $z^{3}$+mz+n
+
+
+{\small\color{gray} This is Vieta's formulas applied to the cubic polynomial}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 3.}} Compute $S_{2}$ using the relation $(a+b+c)^{2} = S_{2} + 2$(ab+bc+ca)
+
+
+{\small\color{gray} Standard algebraic identity relating power sums to elementary symmetric functions}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 4.}} Derive recurrence $S_{k+3} + mS_{k+1} + nS_{k} = 0$ by summing the cubic equation multiplied by $r^{k}$ over all roots
+
+
+{\small\color{gray} Each root satisfies the cubic equation, so this identity holds for each root individually and therefore for their sum}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 5.}} Identify det A as a Vandermonde determinant
+
+
+{\small\color{gray} The matrix A has the standard Vandermonde form with determinant equal to the product of all pairwise differences}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 6.}} Compute $A^T$ A by recognizing that $(A^T A)_{ij} = S_{i+j-2}$
+
+
+{\small\color{gray} Direct calculation of matrix product using the definition of matrix multiplication}
+
+
+\end{stepbox}
+
+
+\begin{stepbox}
+\textbf{\textcolor{accent}{Step 7.}} Calculate det($A^T$ A) by cofactor expansion and use det( A^T  A)=$(det A)^{2} = \Delta$
+
+
+{\small\color{gray} det(AB)=det(A)det(B) and det($A^T$)=det(A) are fundamental properties of determinants}
+
+
+
+{\footnotesize\color{gray!70} Refs: linalg_ii_ht2026.ch2.thm.1}
+
+\end{stepbox}
+
+
+
+
+
+
+% Alternative strategies
+
+
+% Verification
+
+
+\vspace{0.5em}
+\noindent\textbf{Verification Report}
+\vspace{0.2em}
+
+\noindent
+\begin{tabular}{@{}l r@{}}
+
+Structural check & \textcolor{warnamber}{\textsf{WARN}} \\
+
+Adversarial check & \textcolor{passgreen}{\textsf{PASS}} \\
+
+Consistency check & \textcolor{passgreen}{\textsf{PASS}} \\
+\end{tabular}
+
+
+\smallskip
+{\small The solution is mathematically sound and correctly establishes all required results. Part (i) properly analyzes the discriminant using properties of complex conjugates for real coefficient polynomials. Part (ii) correctly applies Vieta's formulas. Parts (iii) and (iv) systematically compute power sums and establish the recurrence relation. Part (v) correctly identifies the Vandermonde determinant structure, computes $A^T$ A with entries S_(i+j-2), and performs the critical determinant calculation to derive $\Delta = - 4m^{3} - 27n^{2}$. The main weakness is reliance on several standard results (Vieta's formulas, Vandermonde determinant formula) that are not explicitly in the provided KB, though these are foundational undergraduate results. The arithmetic in the final determinant expansion has been verified and is correct. Minor notational ambiguity in part (i) does not affect the validity of the argument.}
+
+
+
+
+% Postmortem
+
+
+\vspace{0.5em}
+\begin{postmortembox}
+{\large\bfseries\color{gray!80!black} Postmortem}
+\vspace{0.3em}
+
+
+\begin{insightbox}[Key Insight]
+The discriminant of a cubic polynomial can be computed either as a product of squared differences of roots (geometric definition) or as a polynomial expression in the coefficients (algebraic definition). The bridge between these views is provided by the Vandermonde determinant and the power sum recurrence relations.
+\end{insightbox}
+
+
+
+\begin{insightbox}[Transferable Technique]
+When working with symmetric functions of roots, systematically use: (1) Vieta's formulas to relate elementary symmetric functions to coefficients, (2) recurrence relations derived from the minimal equation to compute power sums efficiently, and (3) determinant identities to connect quadratic forms in the roots to polynomial expressions in the coefficients.
+\end{insightbox}
+
+
+
+\vspace{0.3em}
+\textbf{Common Errors}
+\begin{itemize}[nosep]
+
+  \item \textcolor{failred}{$\bullet$} Forgetting that complex roots of real polynomials come in conjugate pairs, leading to incorrect analysis of when $\Delta$ is real
+
+  \item \textcolor{failred}{$\bullet$} Sign errors when computing Vandermonde determinants due to different conventions for ordering the factors
+
+  \item \textcolor{failred}{$\bullet$} Arithmetic mistakes in the cofactor expansion of the $3 \times 3$ matrix $A^T$ A
+
+  \item \textcolor{failred}{$\bullet$} Incorrectly computing the entries of $A^T$ A by not recognizing the pattern $(A^T A)_{ij} = S_{i+j-2}$
+
+  \item \textcolor{failred}{$\bullet$} Confusing the indexing: $S_{0} = 3$ (sum of 1's) versus starting the count from $S_{1}$
+
+\end{itemize}
+
+
+
+\vspace{0.3em}
+\textbf{Deeper Connections}
+
+This problem connects several major themes: (1) The theory of symmetric polynomials and how any symmetric function of roots can be expressed in terms of the elementary symmetric functions (Vieta). (2) The use of recurrence relations in computational algebra, which generalizes to Newton's identities for general degree. (3) The geometric interpretation of the discriminant as measuring the 'volume' (squared) of the simplex formed by the roots in the complex plane. (4) The role of Vandermonde determinants in interpolation theory and the theory of polynomial bases. (5) The connection to resultants and elimination theory in algebraic geometry.
+
+
+
+\vspace{0.3em}
+\textbf{Variant Problems}
+\begin{itemize}[nosep]
+
+  \item Compute the discriminant formula for a general monic cubic $z^{3} + pz^{2}$+qz+r
+
+  \item Extend the power sum recurrence method to quartic polynomials
+
+  \item Use the discriminant to determine the nature of roots of specific cubic equations
+
+  \item Derive the relationship between discriminant and the Hessian matrix of a cubic form
+
+  \item Prove that the discriminant of $z^{3}$+mz+n equals the resultant of the polynomial and its derivative
+
+\end{itemize}
+
+
+\end{postmortembox}
+
+
+
+
+\end{document}

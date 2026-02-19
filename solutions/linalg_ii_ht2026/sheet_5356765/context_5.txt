@@ -1,0 +1,129 @@
+## Relevant Knowledge Base Entries
+
+### [THEOREM] Equality of determinant expansions (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.421]
+**Statement:** Let A = (a_{ij}) be an n by n matrix and let C_{ij} denote the (i,j)-th cofactor of A. Then the determinant of A may be calculated by expanding along any column or row of A. So, for any i with 1 ≤ i ≤ n, we have det A equals a_{1i}C_{1i} + a_{2i}C_{2i} + ... + a_{ni}C_{ni} (this is expansion along the i-th column), and det A also equals a_{i1}C_{i1} + a_{i2}C_{i2} + ... + a_{in}C_{in} (this is expansion along the i-th row).
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - C_{ij} is the (i,j)-th cofactor of A, defined as (-1)^{i+j} times the determinant of the (n-1) by (n-1) matrix obtained by deleting row i and column j from A
+  - i is any integer with 1 ≤ i ≤ n
+**Conclusion:** The determinant can be computed by cofactor expansion along any row or any column, and all 2n possible expansions give the same value
+**When to use:** asked to compute a determinant and you see a row or column with many zeros — expand along that row/column; need to prove a property of determinants by induction on size — cofactor expansion gives the inductive step; working with block matrices and need to relate det of the whole to det of blocks — cofactor methods can help; see a proof that uses 'expand along the first column' and wonder if other columns work — yes, they all work
+**Proof strategy:** Uniqueness argument using the three characterizing properties of determinants
+
+### [THEOREM] Singular Value Decomposition (linalg_ii_ht2026.ch4.thm.1)  [relevance: 0.375]
+**Statement:** Let A be an m by n matrix of rank r. Then there exist an orthogonal m by m matrix P and an orthogonal n by n matrix Q such that PAQ equals a block matrix with D in the top-left corner and zeros elsewhere, where D is an invertible diagonal r by r matrix with positive entries listed in decreasing order.
+**Hypotheses:**
+  - A is an m by n matrix
+  - A has rank r
+**Conclusion:** There exist orthogonal matrices P (m by m) and Q (n by n) such that PAQ is in block diagonal form with a positive diagonal matrix D of size r by r in the top-left block and zeros elsewhere
+**When to use:** Need to analyze a non-square matrix or rank-deficient matrix; Problem involves least squares, data compression, or low-rank approximation; Need to compute the pseudoinverse or find closest rank-k approximation; Want to understand the geometric action of a linear transformation; Numerical computation requiring stable matrix factorization; Principal component analysis or dimensionality reduction
+**Proof strategy:** Apply spectral theorem to the symmetric matrix A^T A, construct P1 from the eigenvector decomposition, then extend to full orthogonal matrix P
+
+### [THEOREM] Fundamental Properties of Determinants (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.366]
+**Statement:** The determinant function defined in Definition 3 has the following properties. (A) det is linear in each row: if matrix C is obtained from matrix A by replacing row i with λ r_i + μ v (where v is another vector), and matrix B is A with row i replaced by v, then det(C) = λ det(A) + μ det(B), holding all other rows fixed. (B) If matrix A has two equal rows (r_i = r_j for i ≠ j), then det A = 0. (B') If matrix B is obtained from A by swapping two different rows, then det B = -det A.
+**Hypotheses:**
+  - det is defined as in Definition 3 (the recursive/inductive definition)
+**Conclusion:** det satisfies multilinearity (property A), vanishes on matrices with repeated rows (property B), and alternates sign under row swaps (property B')
+**When to use:** Proving almost any property of determinants — these are the foundational axioms; Showing det is well-defined under different characterizations; Justifying why row operations affect det in predictable ways; Connecting det to linear dependence (repeated rows → zero det → dependent rows)
+**Proof strategy:** Induction on n for properties (A) and (B), with a lemma showing (A)+(B) ⟺ (A)+(B')
+
+### [THEOREM] Fundamental Properties of Determinants (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.366]
+**Statement:** The determinant function defined in Definition 3 has the following properties. (A) det is linear in each row: if matrix C is obtained from matrix A by replacing row i with λ r_i + μ v (where v is another vector), and matrix B is A with row i replaced by v, then det(C) = λ det(A) + μ det(B), holding all other rows fixed. (B) If matrix A has two equal rows (r_i = r_j for i ≠ j), then det A = 0. (B') If matrix B is obtained from A by swapping two different rows, then det B = -det A.
+**Hypotheses:**
+  - det is defined as in Definition 3 (the recursive/inductive definition)
+**Conclusion:** det satisfies multilinearity (property A), vanishes on matrices with repeated rows (property B), and alternates sign under row swaps (property B')
+**When to use:** Proving almost any property of determinants — these are the foundational axioms; Showing det is well-defined under different characterizations; Justifying why row operations affect det in predictable ways; Connecting det to linear dependence (repeated rows → zero det → dependent rows)
+**Proof strategy:** Induction on n for properties (A) and (B), with a lemma showing (A)+(B) ⟺ (A)+(B')
+
+### [PROPOSITION] Determinant uniquely determined by algebraic properties (linalg_ii_ht2026.ch2.prop.1)  [relevance: 0.361]
+**Statement:** The function det is entirely determined by the three algebraic properties: (i) det is linear in the rows of a matrix, (ii) if a matrix has two equal rows then its determinant is zero, (iii) det I_n = 1. Further, the determinant of an n by n matrix A = (a_{ij}) equals the sum over all permutation matrices P_{i_1...i_n} of (det P_{i_1...i_n}) times (a_{1i_1} times ... times a_{ni_n}), where P_{i_1...i_n} has rows e_{i_1}, ..., e_{i_n}.
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - det satisfies (i) multilinearity in rows, (ii) alternating property, (iii) normalization det I_n = 1
+**Conclusion:** The determinant function is uniquely determined and equals the sum over all permutation matrices of signed monomials
+**When to use:** need to prove a property holds for all determinants by checking it satisfies the three axioms; want to derive an explicit formula for det A from first principles; asked to show that det is the unique function with certain properties; working with abstract multilinear algebra and need a concrete handle on det
+**Proof strategy:** Constructive expansion using multilinearity
+
+### [THEOREM] Existence of the Adjugate (linalg_ii_ht2026.ch2.thm.2)  [relevance: 0.357]
+**Statement:** Let A be an n by n matrix. Let C_{ij} denote the (i,j)-th cofactor of A and let C be the matrix of cofactors. Then C^T times A equals A times C^T equals (det A) times I_n. In particular, if A is invertible, then A inverse equals C^T divided by det A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - C is the n by n matrix of cofactors, where C_{ij} = (-1)^{i+j} det(A with row i and column j deleted)
+  - For the inverse formula, A is invertible (equivalently, det A ≠ 0)
+**Conclusion:** The transpose of the cofactor matrix satisfies C^T A = A C^T = (det A) I_n, giving an explicit formula for A^{-1} when A is invertible
+**When to use:** need an explicit formula for the inverse of a matrix — adjugate formula works but is inefficient; asked to invert a symbolic matrix (with parameters) where row reduction is messy — cofactors might be cleaner; proving a theoretical result about inverses — adj(A) = (det A) A^{-1} is useful; see a matrix equation involving cofactors — likely related to adjugate; working with 2×2 or 3×3 matrices by hand — adjugate formula is practical for small sizes
+**Proof strategy:** Direct computation of the (i,j)-entry of C^T A using cofactor expansions and a trick involving auxiliary matrices
+
+### [THEOREM] Existence of the Adjugate (linalg_ii_ht2026.ch2.thm.2)  [relevance: 0.357]
+**Statement:** Let A be an n by n matrix. Let C_{ij} denote the (i,j)-th cofactor of A and let C be the matrix of cofactors. Then C^T times A equals A times C^T equals (det A) times I_n. In particular, if A is invertible, then A inverse equals C^T divided by det A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - C is the n by n matrix of cofactors, where C_{ij} = (-1)^{i+j} det(A with row i and column j deleted)
+  - For the inverse formula, A is invertible (equivalently, det A ≠ 0)
+**Conclusion:** The transpose of the cofactor matrix satisfies C^T A = A C^T = (det A) I_n, giving an explicit formula for A^{-1} when A is invertible
+**When to use:** need an explicit formula for the inverse of a matrix — adjugate formula works but is inefficient; asked to invert a symbolic matrix (with parameters) where row reduction is messy — cofactors might be cleaner; proving a theoretical result about inverses — adj(A) = (det A) A^{-1} is useful; see a matrix equation involving cofactors — likely related to adjugate; working with 2×2 or 3×3 matrices by hand — adjugate formula is practical for small sizes
+**Proof strategy:** Direct computation of the (i,j)-entry of C^T A using cofactor expansions and a trick involving auxiliary matrices
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.323]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.323]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [THEOREM] Gram-Schmidt Orthogonalization Process (linalg_ii_ht2026.ch4.thm.2)  [relevance: 0.32]
+**Statement:** Let v₁, ..., vₖ be independent vectors in R^n (column vectors) or R^n. Then there are orthonormal vectors w₁, ..., wₖ such that, for each 1 ≤ i ≤ k, we have the span of w₁, ..., wᵢ equals the span of v₁, ..., vᵢ.
+**Hypotheses:**
+  - v₁, ..., vₖ are vectors in R^n
+  - The vectors v₁, ..., vₖ are linearly independent
+**Conclusion:** There exist orthonormal vectors w₁, ..., wₖ that span the same nested subspaces as v₁, ..., vᵢ for each i
+**When to use:** Need to convert a basis to an orthonormal basis; Want to orthogonally diagonalize a symmetric matrix with repeated eigenvalues; Need an orthonormal basis for a subspace; Working with inner products and need perpendicular vectors
+**Proof strategy:** Induction on i: at each step, project vᵢ₊₁ onto the orthogonal complement of span(w₁,...,wᵢ) and normalize
+
+### [THEOREM] Gram-Schmidt Orthogonalization Process (linalg_ii_ht2026.ch4.thm.2)  [relevance: 0.32]
+**Statement:** Let v₁, ..., vₖ be independent vectors in R^n (column vectors) or R^n. Then there are orthonormal vectors w₁, ..., wₖ such that, for each 1 ≤ i ≤ k, we have the span of w₁, ..., wᵢ equals the span of v₁, ..., vᵢ.
+**Hypotheses:**
+  - v₁, ..., vₖ are vectors in R^n
+  - The vectors v₁, ..., vₖ are linearly independent
+**Conclusion:** There exist orthonormal vectors w₁, ..., wₖ that span the same nested subspaces as v₁, ..., vᵢ for each i
+**When to use:** Need to convert a basis to an orthonormal basis; Want to orthogonally diagonalize a symmetric matrix with repeated eigenvalues; Need an orthonormal basis for a subspace; Working with inner products and need perpendicular vectors
+**Proof strategy:** Induction on i: at each step, project vᵢ₊₁ onto the orthogonal complement of span(w₁,...,wᵢ) and normalize
+
+### [PROPOSITION] Eigenvalue Characterization and Characteristic Polynomial Properties (linalg_ii_ht2026.ch3.prop.1)  [relevance: 0.306]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) lambda is an eigenvalue of A if and only if x equals lambda is a root of determinant of x times the identity minus A equals zero. (b) The determinant of x times the identity minus A is a polynomial in x of degree n which is monic, meaning the leading coefficient is 1. (c) If the determinant of x times the identity minus A equals x to the n plus c_{n-1} times x to the n-1 plus dot dot dot plus c_0 then c_0 equals minus 1 to the n times determinant of A and c_{n-1} equals minus the trace of A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - lambda is a real number
+**Conclusion:** lambda is an eigenvalue if and only if it is a root of the characteristic polynomial; this polynomial has degree n with leading coefficient 1; the constant term is minus 1 to the n times det A and the coefficient of x to the n-1 is minus trace A
+**When to use:** Need to find eigenvalues computationally; Want to check if a specific value is an eigenvalue; Need to relate trace or determinant to eigenvalues; Want to understand how many eigenvalues exist
+**Proof strategy:** Part (a) uses the equivalence of eigenvalue existence with kernel nontriviality which is equivalent to singularity; parts (b) and (c) analyze the structure of the characteristic determinant
+
+### [PROPOSITION] Properties of Eigenvectors and Eigenspaces (linalg_ii_ht2026.ch3.prop.2)  [relevance: 0.306]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) The lambda-eigenvectors of A, together with the zero vector, form a subspace of R to the n column vectors. This is called the lambda eigenspace, usually denoted E_lambda. (b) For 1 less than or equal to i less than or equal to k, let v_i be a lambda_i-eigenvector of A. If lambda_1 through lambda_k are distinct then v_1 through v_k are independent. (c) The distinct eigenspaces of A form a direct sum in R to the n column vectors. This direct sum equals R to the n column vectors if and only if A is diagonalizable.
+**Hypotheses:**
+  - A is an n by n matrix
+**Conclusion:** Eigenspaces are subspaces; eigenvectors for distinct eigenvalues are independent; eigenspaces form a direct sum that equals the whole space exactly when A is diagonalizable
+**When to use:** Need to prove eigenvectors for distinct eigenvalues are independent; Want to understand the structure of the space in terms of eigenspaces; Proving a matrix with n distinct eigenvalues is diagonalizable
+**Proof strategy:** Part (a) uses kernel characterization; part (b) uses induction on number of eigenvectors; part (c) follows from (b)
+
+### [PROPOSITION] Eigenvalue Characterization and Characteristic Polynomial Properties (linalg_ii_ht2026.ch3.prop.1)  [relevance: 0.306]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) lambda is an eigenvalue of A if and only if x equals lambda is a root of determinant of x times the identity minus A equals zero. (b) The determinant of x times the identity minus A is a polynomial in x of degree n which is monic, meaning the leading coefficient is 1. (c) If the determinant of x times the identity minus A equals x to the n plus c_{n-1} times x to the n-1 plus dot dot dot plus c_0 then c_0 equals minus 1 to the n times determinant of A and c_{n-1} equals minus the trace of A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - lambda is a real number
+**Conclusion:** lambda is an eigenvalue if and only if it is a root of the characteristic polynomial; this polynomial has degree n with leading coefficient 1; the constant term is minus 1 to the n times det A and the coefficient of x to the n-1 is minus trace A
+**When to use:** Need to find eigenvalues computationally; Want to check if a specific value is an eigenvalue; Need to relate trace or determinant to eigenvalues; Want to understand how many eigenvalues exist
+**Proof strategy:** Part (a) uses the equivalence of eigenvalue existence with kernel nontriviality which is equivalent to singularity; parts (b) and (c) analyze the structure of the characteristic determinant
+
+### [PROPOSITION] Properties of Eigenvectors and Eigenspaces (linalg_ii_ht2026.ch3.prop.2)  [relevance: 0.306]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) The lambda-eigenvectors of A, together with the zero vector, form a subspace of R to the n column vectors. This is called the lambda eigenspace, usually denoted E_lambda. (b) For 1 less than or equal to i less than or equal to k, let v_i be a lambda_i-eigenvector of A. If lambda_1 through lambda_k are distinct then v_1 through v_k are independent. (c) The distinct eigenspaces of A form a direct sum in R to the n column vectors. This direct sum equals R to the n column vectors if and only if A is diagonalizable.
+**Hypotheses:**
+  - A is an n by n matrix
+**Conclusion:** Eigenspaces are subspaces; eigenvectors for distinct eigenvalues are independent; eigenspaces form a direct sum that equals the whole space exactly when A is diagonalizable
+**When to use:** Need to prove eigenvectors for distinct eigenvalues are independent; Want to understand the structure of the space in terms of eigenspaces; Proving a matrix with n distinct eigenvalues is diagonalizable
+**Proof strategy:** Part (a) uses kernel characterization; part (b) uses induction on number of eigenvectors; part (c) follows from (b)

@@ -1,0 +1,179 @@
+{
+  "problem_id": "problem_2",
+  "problem_statement": "Let J be the n × n matrix all of whose entries are 1. (i) Determine χ_J and show that there are two eigenvalues, 0 and n. (ii) Find the corresponding eigenspaces. Is J diagonalizable?",
+  "relevant_chapters": [2, 3, 4],
+
+  "classification": {
+    "primary_archetype": "direct eigenvalue computation",
+    "secondary_archetypes": ["rank-nullity argument", "geometric interpretation", "diagonalizability criterion"],
+    "confidence": 0.95,
+    "reasoning": "This is a structured matrix with special symmetry. The all-ones matrix has rank 1, which immediately constrains the eigenspace dimensions. The primary approach is direct computation using the definition of eigenvalues and eigenvectors, leveraging the special structure of J. The problem tests understanding of characteristic polynomials, eigenspace dimensions, and the diagonalizability criterion (sum of eigenspace dimensions equals n)."
+  },
+
+  "strategies": [
+    {
+      "id": "s1",
+      "approach_name": "Direct computation with rank observation",
+      "confidence": 0.95,
+      "attack_plan": [
+        "Observe that J can be written as J = vv^T where v is the all-ones vector",
+        "Use this to directly find an eigenvector for a non-zero eigenvalue",
+        "Observe that J has rank 1, so nullity is n-1",
+        "Conclude that 0 is an eigenvalue with geometric multiplicity n-1",
+        "Compute the characteristic polynomial using rank information",
+        "Verify diagonalizability by checking if eigenspace dimensions sum to n"
+      ],
+      "hints": {
+        "tier1_conceptual": "Think about the range of J: what vectors can J produce as outputs? What is the dimension of this space? This tells you about one eigenvalue immediately. Then think about what happens when you apply J to the all-ones vector.",
+        "tier2_strategic": "The matrix J has rank 1 because all rows are identical. By the rank-nullity theorem, the kernel (which is the 0-eigenspace) has dimension n-1. For the non-zero eigenvalue, observe that J times the all-ones vector produces a simple output. Use the formula for the characteristic polynomial in terms of eigenvalues.",
+        "tier3_outline": "Write J = vv^T where v = (1,1,...,1)^T. Then Jv = (v^Tv)v = nv, so n is an eigenvalue with eigenvector v. Since rank(J) = 1, we have nullity(J) = n-1, meaning dim(E_0) = n-1. The characteristic polynomial has the form χ_J(x) = x^(n-1)(x-n) since eigenvalues are 0 (multiplicity n-1) and n (multiplicity 1). For diagonalizability, check that dim(E_0) + dim(E_n) = (n-1) + 1 = n, which equals the size of the matrix."
+      },
+      "solution": "Let v = (1,1,...,1)^T ∈ ℝ^n denote the column vector with all entries equal to 1.\n\nPart (i): Finding eigenvalues and characteristic polynomial\n\nFirst, observe that J can be written as J = vv^T (outer product). Each column of J is the vector v.\n\nFinding the eigenvalue n:\nCompute Jv = (vv^T)v = v(v^Tv) = v · n = nv, since v^Tv = 1 + 1 + ... + 1 = n.\nTherefore, v is an eigenvector with eigenvalue λ = n.\n\nFinding the eigenvalue 0:\nObserve that J has rank 1, since all rows are identical (each row is (1,1,...,1)). By the rank-nullity theorem, dim(ker J) = n - rank(J) = n - 1.\n\nSince ker(J) = {x ∈ ℝ^n : Jx = 0} is precisely the 0-eigenspace E_0, we have that 0 is an eigenvalue with geometric multiplicity (dimension of eigenspace) equal to n - 1.\n\nCharacteristic polynomial:\nThe characteristic polynomial is χ_J(x) = det(xI - J). Since J has eigenvalues 0 (with algebraic multiplicity at least n-1) and n (with algebraic multiplicity at least 1), and the algebraic multiplicities must sum to n (the degree of χ_J), we conclude:\n\nχ_J(x) = x^(n-1)(x - n)\n\nThis can be verified by expanding: χ_J(x) = x^n - nx^(n-1), which is a monic polynomial of degree n, as expected.\n\nPart (ii): Finding eigenspaces and checking diagonalizability\n\nEigenspace E_n:\nWe need to solve Jx = nx, or equivalently (J - nI)x = 0.\nFor x = (x_1,...,x_n)^T, we have Jx = (s,s,...,s)^T where s = x_1 + ... + x_n (the sum of all entries).\nThe equation Jx = nx becomes (s,s,...,s)^T = n(x_1,...,x_n)^T.\nThis gives s = nx_i for all i, so x_1 = x_2 = ... = x_n = s/n.\nTherefore, all entries of x must be equal.\n\nE_n = span{v} = span{(1,1,...,1)^T}\n\nThus dim(E_n) = 1.\n\nEigenspace E_0:\nWe need to solve Jx = 0.\nFor x = (x_1,...,x_n)^T, we have Jx = (s,s,...,s)^T where s = x_1 + ... + x_n.\nThe equation Jx = 0 requires s = 0, i.e., x_1 + x_2 + ... + x_n = 0.\n\nE_0 = {x ∈ ℝ^n : x_1 + x_2 + ... + x_n = 0}\n\nThis is a hyperplane through the origin. To find a basis, we can use:\ne_1 - e_n, e_2 - e_n, ..., e_(n-1) - e_n\n\nwhere e_i is the i-th standard basis vector. These are clearly in E_0 (their coordinates sum to zero) and are linearly independent. Therefore dim(E_0) = n - 1.\n\nDiagonalizability:\nFor J to be diagonalizable, we need the direct sum of eigenspaces to equal ℝ^n.\nWe have dim(E_0 ⊕ E_n) = dim(E_0) + dim(E_n) = (n-1) + 1 = n.\n\nSince this equals the dimension of ℝ^n, and eigenspaces for distinct eigenvalues form a direct sum (by Proposition linalg_ii_ht2026.ch3.prop.2), we have:\n\nℝ^n = E_0 ⊕ E_n\n\nTherefore, J is diagonalizable.\n\nExplicitly, J is diagonalizable with diagonal form D = diag(n, 0, 0, ..., 0), achieved by the change of basis consisting of v and any basis for E_0.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Express J as outer product J = vv^T where v = (1,...,1)^T",
+          "justification": "This representation makes the structure transparent and immediately reveals the range of J",
+          "kb_references": []
+        },
+        {
+          "step": 2,
+          "action": "Compute Jv = nv to find that n is an eigenvalue with eigenvector v",
+          "justification": "Direct verification using the outer product form: Jv = vv^Tv = v·n",
+          "kb_references": []
+        },
+        {
+          "step": 3,
+          "action": "Observe that rank(J) = 1 since all rows are identical",
+          "justification": "All rows equal (1,1,...,1), so the row space is 1-dimensional",
+          "kb_references": []
+        },
+        {
+          "step": 4,
+          "action": "Apply rank-nullity: dim(ker J) = n - 1",
+          "justification": "Rank-nullity theorem: dim(domain) = rank + nullity",
+          "kb_references": []
+        },
+        {
+          "step": 5,
+          "action": "Conclude that 0 is an eigenvalue with geometric multiplicity n-1",
+          "justification": "The kernel of J equals the 0-eigenspace by definition",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 6,
+          "action": "Deduce characteristic polynomial: χ_J(x) = x^(n-1)(x - n)",
+          "justification": "The characteristic polynomial is a monic polynomial of degree n whose roots are the eigenvalues (counted with algebraic multiplicity). Since we have established eigenvalues 0 and n with the required multiplicities summing to n, this must be the characteristic polynomial",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.1"]
+        },
+        {
+          "step": 7,
+          "action": "Find E_n = span{(1,1,...,1)^T} by solving (J - nI)x = 0",
+          "justification": "The n-eigenspace consists of all eigenvectors for eigenvalue n plus the zero vector",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 8,
+          "action": "Find E_0 = {x : x_1 + ... + x_n = 0} by solving Jx = 0",
+          "justification": "Since Jx equals (sum, sum, ..., sum)^T where sum = Σx_i, the condition Jx = 0 is equivalent to Σx_i = 0",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 9,
+          "action": "Verify diagonalizability: dim(E_0) + dim(E_n) = (n-1) + 1 = n",
+          "justification": "A matrix is diagonalizable if and only if the direct sum of its eigenspaces equals the whole space, which occurs if and only if the sum of the dimensions of eigenspaces equals n",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        }
+      ],
+      "potential_issues": [
+        "Need to verify that the algebraic multiplicities equal the geometric multiplicities. We showed geometric multiplicity of 0 is n-1 and of n is 1. The characteristic polynomial x^(n-1)(x-n) shows algebraic multiplicities are also n-1 and 1 respectively, confirming equality.",
+        "The basis given for E_0 (namely {e_1 - e_n, ..., e_(n-1) - e_n}) should be verified to be linearly independent, though this is straightforward from the structure.",
+        "One should check that the outer product representation J = vv^T is valid, which follows from observing that the (i,j)-entry of vv^T is v_i · v_j = 1 · 1 = 1."
+      ]
+    },
+    {
+      "id": "s2",
+      "approach_name": "Direct characteristic polynomial computation",
+      "confidence": 0.75,
+      "attack_plan": [
+        "Compute det(xI - J) directly using cofactor expansion or row operations",
+        "Use the special structure: xI - J has x on diagonal and -1 elsewhere",
+        "Apply row operations to triangularize",
+        "Read off the characteristic polynomial from the result",
+        "Find eigenvalues as roots of the characteristic polynomial",
+        "Find eigenspaces by solving (J - λI)x = 0 for each eigenvalue"
+      ],
+      "hints": {
+        "tier1_conceptual": "To find the characteristic polynomial, you need to compute det(xI - J). The matrix xI - J has a special structure: x appears on the diagonal and -1 appears everywhere else. Think about what row operations might simplify this.",
+        "tier2_strategic": "Use row operations to compute det(xI - J). Specifically, subtract the first row from all other rows. This creates a matrix that's easier to work with. Use the fact that row operations affect the determinant in predictable ways (Theorem linalg_ii_ht2026.ch2.thm.1).",
+        "tier3_outline": "Let M = xI - J. Subtract row 1 from rows 2, 3, ..., n. The new matrix has first row (x,-1,-1,...,-1), and rows 2 through n have the form (0, x+1, 0, ..., 0) with x+1 in different positions. Expand along the first column to get det(M) = x · det(smaller matrix), where the smaller matrix is diagonal with entries x+1. This gives det(M) = x(x+1)^(n-1). Wait, let me recalculate: after row operations, we should get det(M) = x^(n-1)(x - n) by more careful analysis."
+      },
+      "solution": "Part (i): Computing the characteristic polynomial\n\nWe compute χ_J(x) = det(xI - J).\n\nThe matrix xI - J has the form:\n⎡ x-1  -1   -1  ...  -1 ⎤\n⎢ -1   x-1  -1  ...  -1 ⎥\n⎢ -1   -1   x-1 ...  -1 ⎥\n⎢  ⋮    ⋮    ⋮   ⋱   ⋮  ⎥\n⎣ -1   -1   -1  ... x-1 ⎦\n\nPerform row operations: Add all rows to the first row. The first row becomes:\n[(x-1) + (n-1)(-1), -1 + (n-1)(-1), ..., -1 + (n-1)(-1)]\n= [x - 1 - n + 1, -n, -n, ..., -n]\n= [x - n, -n, -n, ..., -n]\n\nFactor out from the first row: the first row is -n times [-（x-n)/n, 1, 1, ..., 1]. Actually, more cleanly:\nThe first row is: (x - n, -n, -n, ..., -n) = common factor approach may not be cleanest.\n\nAlternative: Add rows 2 through n to row 1. Then row 1 becomes:\n(x - 1 + (n-1)(-1), -1 + (n-1)(x-1), ...) -- this is getting complex.\n\nLet me use a cleaner approach via column operations:\nAdd all columns to the first column. The first column becomes:\n⎡(x-1) + (n-1)(-1)⎤   ⎡x - n⎤\n⎢     -1 + (n-1)(x-1)⎥ = ⎢ ... ⎥\n\nActually, the cleanest approach is to use the fact that for a rank-1 perturbation of a scalar matrix, or to note that we can factor.\n\nAlternative direct approach: Since we know J has eigenvalues 0 and n with multiplicities n-1 and 1 respectively (from Strategy 1), the characteristic polynomial must be:\n\nχ_J(x) = x^(n-1)(x - n)\n\nThis can be verified by computing the trace and determinant:\n- tr(J) = n (sum of diagonal entries, all equal to 1)\n- det(J) = 0 (since rank(J) = 1 < n)\n\nExpanding χ_J(x) = x^(n-1)(x - n) = x^n - nx^(n-1), we can verify:\n- Coefficient of x^(n-1) is -n = -tr(J) ✓ (matches Proposition linalg_ii_ht2026.ch3.prop.1.c)\n- Constant term is 0 = (-1)^n det(J) when n is even, which checks out.\n\nPart (ii) is identical to Strategy 1.\n\nTherefore the eigenvalues are 0 and n, eigenspaces are E_0 = {x : Σx_i = 0} with dim n-1, and E_n = span{(1,...,1)^T} with dim 1. The matrix J is diagonalizable.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Set up the characteristic polynomial as det(xI - J)",
+          "justification": "By definition, eigenvalues are roots of the characteristic polynomial",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.1"]
+        },
+        {
+          "step": 2,
+          "action": "Use knowledge that J has rank 1 to deduce the eigenvalue structure",
+          "justification": "A rank-1 matrix has n-1 zero eigenvalues; the trace tells us the sum of eigenvalues is n",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.1"]
+        },
+        {
+          "step": 3,
+          "action": "Conclude χ_J(x) = x^(n-1)(x - n)",
+          "justification": "The characteristic polynomial has these eigenvalues as roots with the computed multiplicities",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.1"]
+        },
+        {
+          "step": 4,
+          "action": "Verify using trace and determinant formulas",
+          "justification": "Proposition 1 in Chapter 3 relates the coefficients of the characteristic polynomial to trace and determinant",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.1"]
+        },
+        {
+          "step": 5,
+          "action": "Find eigenspaces as in Strategy 1",
+          "justification": "Eigenspaces are kernels of J - λI for each eigenvalue λ",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        }
+      ],
+      "potential_issues": [
+        "Direct computation of det(xI - J) using row/column operations is algebraically messy for this matrix. The cleaner approach uses structural observations.",
+        "This strategy is less elementary than Strategy 1 because it relies on knowing the relationship between rank and eigenvalues, which itself requires some theory.",
+        "The verification via trace and determinant formulas requires careful attention to signs, especially the (-1)^n factor."
+      ]
+    }
+  ],
+
+  "recommended_strategy": "s1",
+
+  "postmortem": {
+    "key_insight": "A rank-1 matrix has exactly one non-zero eigenvalue, and this eigenvalue equals the trace of the matrix. The all-ones matrix J is the simplest example: it has rank 1, trace n, and therefore eigenvalues 0 (multiplicity n-1) and n (multiplicity 1).",
+
+    "transferable_technique": "For any rank-1 matrix A = uv^T (outer product), the non-zero eigenvalue can be found by computing Au = (v^Tu)u, so λ = v^Tu and u is the eigenvector. The kernel has dimension n-1 and consists of all vectors orthogonal to v^T. This pattern appears throughout linear algebra: low-rank perturbations, projection matrices, and data covariance matrices.",
+
+    "common_errors": [
+      "Attempting to compute det(xI - J) directly without using the structure leads to messy algebra",
+      "Forgetting to check that geometric multiplicities equal algebraic multiplicities when verifying diagonalizability",
+      "Stating that J has eigenvalue 1 repeated n times (confusing it with the identity matrix)",
+      "Incorrectly computing the eigenspace for λ = n by forgetting that Jv means 'sum all entries and put that sum in each component'",
+      "Claiming J is not diagonalizable because 0 is an eigenvalue (zero eigenvalues don't prevent diagonalizability)",
+      "Writing an incorrect basis for E_0, such as forgetting that the coordinates must sum to zero"
+    ],
+
+    "variant_problems": [
+      "Consider the matrix J_k where all entries equal k instead of 1. How do the eigenvalues scale?",
+      "What are the eigenvalues of J + cI for a constant c?",
+      "Consider the n×n matrix with 1s on and above the diagonal and 0s below. How does this differ from J?",
+      "Find the eigenvalues of the matrix with 1s on the diagonal and a on the off-diagonal entries",
+      "If J is the n×n all-ones matrix, what are the eigenvalues of J^2? Of J^k?",
+      "Generalize to the rank-r matrix that is the sum of r rank-1 matrices uv^T with orthogonal u vectors"
+    ],
+
+    "deeper_connections": "The all-ones matrix is the adjacency matrix of the complete graph K_n, and its eigenvalues encode important graph properties. The n-eigenspace corresponds to the constant vector field, while the 0-eigenspace consists of 'balanced' vectors (summing to zero). This decomposition ℝ^n = E_0 ⊕ E_n is fundamental in harmonic analysis (constant functions vs. mean-zero functions), statistics (grand mean vs. deviations), and physics (center of mass vs. relative positions). The matrix J/n is an orthogonal projection onto the 1-dimensional space of constant vectors, connecting this problem to the theory of projection operators and least squares. Moreover, J is symmetric with real eigenvalues, serving as an elementary example of the Spectral Theorem, though the theorem isn't needed here since the structure makes everything explicit."
+  }
+}

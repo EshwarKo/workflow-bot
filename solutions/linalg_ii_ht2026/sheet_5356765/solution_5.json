@@ -1,0 +1,107 @@
+{
+  "problem_id": "problem_5",
+  "problem_statement": "Let m, n be real numbers and let a, b, c be the roots of the cubic z³+mz+n=0. The discriminant Δ of the cubic is given by Δ=(a-b)²(a-c)²(b-c)². The problem asks to: (i) Explain why Δ is real and what can be said about roots for different signs of Δ; (ii) Show a+b+c=0 and find m, n in terms of a, b, c; (iii) Find S₀, S₁, S₂ in terms of m, n where Sₖ=aᵏ+bᵏ+cᵏ; (iv) Prove Sₖ₊₃+mSₖ₊₁+nSₖ=0 and find S₃, S₄; (v) Determine det A and A^T A for the Vandermonde matrix A, and deduce Δ=-4m³-27n².",
+  "relevant_chapters": [2, 3, 4],
+  "classification": {
+    "primary_archetype": "polynomial identities and symmetric functions",
+    "secondary_archetypes": [
+      "Vandermonde determinant",
+      "matrix computation",
+      "recurrence relations",
+      "complex conjugate properties"
+    ],
+    "confidence": 0.95,
+    "reasoning": "This problem combines classical algebraic techniques (Vieta's formulas, power sum identities) with linear algebraic tools (Vandermonde determinants, matrix products). The discriminant analysis uses properties of polynomials with real coefficients and complex roots. The final computation requires explicit matrix multiplication and determinant properties."
+  },
+  "strategies": [
+    {
+      "id": "s1",
+      "approach_name": "Direct algebraic computation with symmetric functions",
+      "confidence": 0.95,
+      "attack_plan": [
+        "Use complex conjugate properties to establish that Δ is real",
+        "Apply Vieta's formulas to the expanded polynomial (z-a)(z-b)(z-c)",
+        "Compute power sums using relations from parts (i)-(ii)",
+        "Establish the recurrence relation by substituting the cubic equation",
+        "Compute the Vandermonde determinant directly",
+        "Calculate A^T A explicitly and relate (det A)² to Δ",
+        "Use the relations from previous parts to express Δ in terms of m, n"
+      ],
+      "hints": {
+        "tier1_conceptual": "For part (i), consider what happens to Δ when roots are complex conjugates versus all real. For the later parts, think about what the coefficients of a polynomial tell you about symmetric functions of its roots. The Vandermonde determinant has a standard formula involving differences of roots.",
+        "tier2_strategic": "Use Vieta's formulas to relate elementary symmetric functions to coefficients. For the recurrence in part (iv), multiply the equation aᵏ⁺³+maᵏ⁺¹+naᵏ=0 by noting each root satisfies the cubic. For part (v), recognize that det A is a Vandermonde determinant with value (b-a)(c-a)(c-b), and compute A^T A by expanding the (i,j)-entry as Sᵢ₊ⱼ₋₂. The key is that det(A^T A) = (det A)² = Δ.",
+        "tier3_outline": "Part (i): Δ is a product of squared terms, so it's real (or note that if complex roots exist, they come in conjugate pairs for real polynomials, making differences conjugate pairs whose product is real). When Δ>0, all roots are real and distinct; Δ=0 means repeated roots; Δ<0 means one real and two complex conjugate roots. Part (ii): Expand (z-a)(z-b)(z-c) = z³-(a+b+c)z²+(ab+bc+ca)z-abc; matching with z³+mz+n gives coefficient of z² is 0, so a+b+c=0; also ab+bc+ca=m and abc=-n. Part (iii): S₀=3, S₁=a+b+c=0, S₂=a²+b²+c²=(a+b+c)²-2(ab+bc+ca)=0-2m=-2m. Part (iv): Since each root satisfies aᵏ⁺³=-maᵏ⁺¹-naᵏ, sum over roots to get Sₖ₊₃=-mSₖ₊₁-nSₖ. Thus S₃=-mS₁-nS₀=-n·3=-3n and S₄=-mS₂-nS₁=-m(-2m)=2m². Part (v): det A = (b-a)(c-a)(c-b) (Vandermonde). A^T A has (i,j) entry equal to Sᵢ₊ⱼ₋₂. So A^T A = [[S₀, S₁, S₂], [S₁, S₂, S₃], [S₂, S₃, S₄]] = [[3, 0, -2m], [0, -2m, -3n], [-2m, -3n, 2m²]]. Compute det(A^T A) = (det A)² = Δ. Expanding this 3×3 determinant and setting equal to Δ yields Δ=-4m³-27n²."
+      },
+      "solution": "**Part (i):** The discriminant Δ=(a-b)²(a-c)²(b-c)² is a product of squared terms, hence non-negative if all factors are real. However, for a cubic with real coefficients m and n, if complex roots exist, they must appear as conjugate pairs. Since we have three roots, either all three are real, or one is real and two are complex conjugates.\n\nIf all roots are real, then all differences (a-b), (a-c), (b-c) are real, so Δ is real and non-negative. If a is real and b, c are complex conjugates, write b=p+qi and c=p-qi with q≠0. Then b-c=2qi, so |b-c|²=4q². Also, a-b and a-c are conjugates, so (a-b)(a-c) = |a-b|². Therefore Δ = |a-b|⁴·|a-c|⁴·(4q²)² is real. Moreover, we can verify by expanding that Δ is actually a symmetric polynomial in the roots with real coefficients, hence must be real.\n\n**Sign interpretation:**\n- Δ > 0: All three roots are real and distinct (all pairwise differences nonzero)\n- Δ = 0: At least two roots coincide (repeated root)\n- Δ < 0: One real root and two complex conjugate roots (the product involves conjugate differences)\n\n**Part (ii):** Expand the left side of (z-a)(z-b)(z-c):\n\n(z-a)(z-b)(z-c) = z³ - (a+b+c)z² + (ab+bc+ca)z - abc\n\nComparing with z³+mz+n (noting there is no z² term), we get:\n- Coefficient of z²: -(a+b+c) = 0, therefore **a+b+c = 0**\n- Coefficient of z: ab+bc+ca = m, therefore **m = ab+bc+ca**\n- Constant term: -abc = n, therefore **n = -abc**\n\n**Part (iii):** \n- S₀ = a⁰+b⁰+c⁰ = 1+1+1 = **3**\n- S₁ = a+b+c = **0** (from part ii)\n- S₂ = a²+b²+c²\n\nTo find S₂, use the identity (a+b+c)² = a²+b²+c² + 2(ab+bc+ca):\n\n0 = S₂ + 2m\n\nTherefore **S₂ = -2m**.\n\n**Part (iv):** Each root satisfies the cubic equation. Specifically, for each root r ∈ {a,b,c}:\n\nr³ + mr + n = 0\n\nMultiplying by rᵏ:\n\nrᵏ⁺³ + mrᵏ⁺¹ + nrᵏ = 0\n\nSumming over all three roots:\n\naᵏ⁺³ + bᵏ⁺³ + cᵏ⁺³ + m(aᵏ⁺¹ + bᵏ⁺¹ + cᵏ⁺¹) + n(aᵏ + bᵏ + cᵏ) = 0\n\nTherefore **Sₖ₊₃ + mSₖ₊₁ + nSₖ = 0** for all k≥0.\n\nApplying this recurrence:\n\nFor k=0: S₃ + mS₁ + nS₀ = 0\nS₃ + m(0) + n(3) = 0\n**S₃ = -3n**\n\nFor k=1: S₄ + mS₂ + nS₁ = 0\nS₄ + m(-2m) + n(0) = 0\n**S₄ = 2m²**\n\n**Part (v):** The matrix A is a Vandermonde matrix:\n\nA = [[1, a, a²],\n     [1, b, b²],\n     [1, c, c²]]\n\nThe determinant of a Vandermonde matrix with rows corresponding to values a, b, c is:\n\n**det A = (b-a)(c-a)(c-b)**\n\nNote that det A = -(a-b)(c-a)(c-b) = (a-b)(a-c)(c-b) = (a-b)(c-a)(c-b) up to sign. More carefully:\n\ndet A = (b-a)(c-a)(c-b)\n\nNow compute A^T A. The (i,j)-entry of A^T A is the dot product of the i-th column of A^T (which is the i-th row of A) with the j-th column of A^T (which is the j-th row of A).\n\nActually, the (i,j)-entry of A^T A equals the sum: 1·1·a^(i-1)·b^(j-1) terms. Let me be more careful.\n\nThe i-th row of A^T is the i-th column of A: [1, 1, 1] for i=1, [a, b, c] for i=2, [a², b², c²] for i=3.\nThe j-th column of A^T is the j-th row of A^T, which is the j-th column of A.\n\nSo (A^T A)ᵢⱼ = (row i of A^T)·(column j of A^T) = (column i of A)·(row j of A).\n\nColumn i of A (for i=1,2,3) is [1, 1, 1]^T, [a, b, c]^T, [a², b², c²]^T.\nRow j of A (for j=1,2,3) is [1, a, a²], [1, b, b²], [1, c, c²].\n\nWait, this is getting confusing. Let me compute directly.\n\n(A^T A)ᵢⱼ = Σₖ (A^T)ᵢₖ(A)ₖⱼ = Σₖ Aₖᵢ Aₖⱼ\n\nFor row k=1,2,3 and columns i,j:\nRow 1 of A: [1, a, a²]\nRow 2 of A: [1, b, b²]\nRow 3 of A: [1, c, c²]\n\nSo (A^T A)ᵢⱼ = 1^(i-1)·1^(j-1) + a^(i-1)·a^(j-1) + b^(i-1)·b^(j-1) + c^(i-1)·c^(j-1) where we index from 1.\n\nWait, let me index columns of A as 1,2,3 corresponding to powers 0,1,2.\n\n(A^T A)ᵢⱼ = Σₖ=1,2,3 [rₖ^(i-1)][rₖ^(j-1)] where r₁=1, r₂=1, r₃=1 for column 1... No, this is wrong.\n\nLet me restart. A has entry Aᵢⱼ where i indexes rows (corresponding to roots) and j indexes columns (corresponding to powers).\n\nA₁₁=1, A₁₂=a, A₁₃=a²\nA₂₁=1, A₂₂=b, A₂₃=b²\nA₃₁=1, A₃₂=c, A₃₃=c²\n\nSo Aᵢⱼ = rᵢ^(j-1) where r₁=a, r₂=b, r₃=c.\n\n(A^T A)ₘₙ = Σᵢ Aᵢₘ Aᵢₙ = Σᵢ rᵢ^(m-1) rᵢ^(n-1) = Σᵢ rᵢ^(m+n-2) = Sₘ₊ₙ₋₂\n\nTherefore:\n\nA^T A = [[S₀, S₁, S₂],\n         [S₁, S₂, S₃],\n         [S₂, S₃, S₄]]\n       = [[3, 0, -2m],\n          [0, -2m, -3n],\n          [-2m, -3n, 2m²]]\n\nNow det(A^T A) = det(A^T)det(A) = (det A)².\n\nAlso, (det A)² = [(b-a)(c-a)(c-b)]² = (b-a)²(c-a)²(c-b)² = (a-b)²(a-c)²(b-c)² = Δ.\n\nSo we need to compute det(A^T A) and set it equal to Δ.\n\nExpanding along the first row:\n\ndet(A^T A) = 3·det[[-2m, -3n], [-3n, 2m²]] - 0 + (-2m)·det[[0, -3n], [-2m, 2m²]]\n\n= 3[(-2m)(2m²) - (-3n)(-3n)] + (-2m)[0·2m² - (-3n)(-2m)]\n= 3[-4m³ - 9n²] + (-2m)[-6mn]\n= -12m³ - 27n² + 12m²n\n\nHmm, this doesn't immediately give -4m³-27n². Let me recalculate.\n\ndet[[3, 0, -2m],\n    [0, -2m, -3n],\n    [-2m, -3n, 2m²]]\n\nExpanding along the first row:\n= 3·det[[-2m, -3n], [-3n, 2m²]] - 0·(...) + (-2m)·det[[0, -2m], [-2m, -3n]]\n\n= 3·[(-2m)(2m²) - (-3n)(-3n)] + (-2m)·[0·(-3n) - (-2m)(-2m)]\n= 3·[-4m³ - 9n²] + (-2m)·[0 - 4m²]\n= -12m³ - 27n² + (-2m)(-4m²)\n= -12m³ - 27n² + 8m³\n= -4m³ - 27n²\n\nTherefore **Δ = -4m³ - 27n²**.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Establish that Δ is real by analyzing the structure of roots for polynomials with real coefficients",
+          "justification": "For real coefficient polynomials, complex roots appear in conjugate pairs. The discriminant is a symmetric polynomial in the roots with integer coefficients, hence must be real when the polynomial has real coefficients.",
+          "kb_references": []
+        },
+        {
+          "step": 2,
+          "action": "Expand (z-a)(z-b)(z-c) and compare coefficients with z³+mz+n",
+          "justification": "This is Vieta's formulas applied to the cubic polynomial",
+          "kb_references": []
+        },
+        {
+          "step": 3,
+          "action": "Compute S₂ using the relation (a+b+c)²=S₂+2(ab+bc+ca)",
+          "justification": "Standard algebraic identity relating power sums to elementary symmetric functions",
+          "kb_references": []
+        },
+        {
+          "step": 4,
+          "action": "Derive recurrence Sₖ₊₃+mSₖ₊₁+nSₖ=0 by summing the cubic equation multiplied by rᵏ over all roots",
+          "justification": "Each root satisfies the cubic equation, so this identity holds for each root individually and therefore for their sum",
+          "kb_references": []
+        },
+        {
+          "step": 5,
+          "action": "Identify det A as a Vandermonde determinant",
+          "justification": "The matrix A has the standard Vandermonde form with determinant equal to the product of all pairwise differences",
+          "kb_references": []
+        },
+        {
+          "step": 6,
+          "action": "Compute A^T A by recognizing that (A^T A)ᵢⱼ = Sᵢ₊ⱼ₋₂",
+          "justification": "Direct calculation of matrix product using the definition of matrix multiplication",
+          "kb_references": []
+        },
+        {
+          "step": 7,
+          "action": "Calculate det(A^T A) by cofactor expansion and use det(A^T A)=(det A)²=Δ",
+          "justification": "det(AB)=det(A)det(B) and det(A^T)=det(A) are fundamental properties of determinants",
+          "kb_references": ["linalg_ii_ht2026.ch2.thm.1"]
+        }
+      ],
+      "potential_issues": [
+        "The sign analysis for Δ when complex roots are present requires careful handling of conjugate pairs",
+        "The Vandermonde determinant formula should be verified for the correct ordering of differences",
+        "The cofactor expansion calculation in part (v) is arithmetic-heavy and prone to sign errors"
+      ]
+    }
+  ],
+  "recommended_strategy": "s1",
+  "postmortem": {
+    "key_insight": "The discriminant of a cubic polynomial can be computed either as a product of squared differences of roots (geometric definition) or as a polynomial expression in the coefficients (algebraic definition). The bridge between these views is provided by the Vandermonde determinant and the power sum recurrence relations.",
+    "transferable_technique": "When working with symmetric functions of roots, systematically use: (1) Vieta's formulas to relate elementary symmetric functions to coefficients, (2) recurrence relations derived from the minimal equation to compute power sums efficiently, and (3) determinant identities to connect quadratic forms in the roots to polynomial expressions in the coefficients.",
+    "common_errors": [
+      "Forgetting that complex roots of real polynomials come in conjugate pairs, leading to incorrect analysis of when Δ is real",
+      "Sign errors when computing Vandermonde determinants due to different conventions for ordering the factors",
+      "Arithmetic mistakes in the cofactor expansion of the 3×3 matrix A^T A",
+      "Incorrectly computing the entries of A^T A by not recognizing the pattern (A^T A)ᵢⱼ = Sᵢ₊ⱼ₋₂",
+      "Confusing the indexing: S₀=3 (sum of 1's) versus starting the count from S₁"
+    ],
+    "variant_problems": [
+      "Compute the discriminant formula for a general monic cubic z³+pz²+qz+r",
+      "Extend the power sum recurrence method to quartic polynomials",
+      "Use the discriminant to determine the nature of roots of specific cubic equations",
+      "Derive the relationship between discriminant and the Hessian matrix of a cubic form",
+      "Prove that the discriminant of z³+mz+n equals the resultant of the polynomial and its derivative"
+    ],
+    "deeper_connections": "This problem connects several major themes: (1) The theory of symmetric polynomials and how any symmetric function of roots can be expressed in terms of the elementary symmetric functions (Vieta). (2) The use of recurrence relations in computational algebra, which generalizes to Newton's identities for general degree. (3) The geometric interpretation of the discriminant as measuring the 'volume' (squared) of the simplex formed by the roots in the complex plane. (4) The role of Vandermonde determinants in interpolation theory and the theory of polynomial bases. (5) The connection to resultants and elimination theory in algebraic geometry."
+  }
+}

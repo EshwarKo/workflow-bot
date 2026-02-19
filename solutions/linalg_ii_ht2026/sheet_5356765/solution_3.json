@@ -1,0 +1,159 @@
+{
+  "problem_id": "problem_3",
+  "problem_statement": "Let S: V → V be a linear map on a vector space V such that S² = I. (i) Show that the only possible eigenvalues of S are 1 and -1. Let U denote the 1-eigenspace and W denote the -1-eigenspace. (ii) Suppose that v ∈ V and v = u + w where u ∈ U and w ∈ W. Determine u and w in terms of v and Sv. (iii) Verify that u ∈ U and w ∈ W for the u, w found in (ii) and deduce that V = U ⊕ W. (iv) If B_U and B_W are bases for U, W what is the matrix for S wrt B_U ∪ B_W? (v) Let V = M_{n×n}(R) and S(A) = A^T. Describe U and W and find an eigenbasis for S.",
+  "relevant_chapters": [3, 4],
+  "classification": {
+    "primary_archetype": "spectral/eigenspace decomposition",
+    "secondary_archetypes": ["algebraic manipulation with minimal polynomial", "direct sum construction", "projection operators"],
+    "confidence": 0.95,
+    "reasoning": "This is a canonical problem about involutions (S² = I). The key is recognizing that S² = I constrains eigenvalues via the minimal polynomial, then constructing explicit projection formulas (I+S)/2 and (I-S)/2 to decompose V into eigenspaces. Part (v) applies this theory to the concrete example of matrix transpose."
+  },
+  "strategies": [
+    {
+      "id": "s1",
+      "approach_name": "Minimal polynomial and projection operators",
+      "confidence": 0.95,
+      "attack_plan": [
+        "Use S² = I to show that if Sv = λv then λ² = 1, so λ ∈ {1, -1}",
+        "Assume v = u + w and apply S to get Sv = u - w",
+        "Solve the 2×2 linear system {v = u + w, Sv = u - w} for u and w",
+        "Verify the formulas u = (v + Sv)/2 and w = (v - Sv)/2 define elements of U and W",
+        "Show this decomposition is unique to establish V = U ⊕ W",
+        "Write S in block diagonal form with respect to eigenbasis",
+        "For transpose: identify U as symmetric matrices and W as skew-symmetric matrices",
+        "Construct explicit basis using elementary matrices"
+      ],
+      "hints": {
+        "tier1_conceptual": "The condition S² = I is very restrictive. Think about what happens when you apply S to an eigenvector. How does the relation S² = I constrain the eigenvalue? Once you know all possible eigenvalues, consider how the identity map can be split into two projection operators associated with each eigenvalue.",
+        "tier2_strategic": "If Sv = λv, then applying S again gives S²v = λSv = λ²v. But S² = I, so v = λ²v, which means λ² = 1 (since v ≠ 0). This forces λ ∈ {1, -1}. For part (ii), you have two equations: v = u + w and Sv = S(u + w) = Su + Sw = u - w (since u ∈ U and w ∈ W). This is a simple 2×2 linear system. For part (v), recall that a matrix satisfies A^T = A (symmetric) or A^T = -A (skew-symmetric) to be eigenvectors of transpose.",
+        "tier3_outline": "Part (i): Let λ be an eigenvalue with eigenvector v. Then S²v = S(Sv) = S(λv) = λSv = λ²v. Since S² = I, we have v = λ²v, so (1 - λ²)v = 0. Since v ≠ 0, we get λ² = 1, giving λ = ±1. Part (ii): From v = u + w and Sv = u - w, add to get 2u = v + Sv, so u = (v + Sv)/2. Subtract to get 2w = v - Sv, so w = (v - Sv)/2. Part (iii): Verify S(u) = S((v + Sv)/2) = (Sv + S²v)/2 = (Sv + v)/2 = u, so u ∈ U. Similarly S(w) = -w. To show V = U ⊕ W, note every v can be written as u + w with this formula, and if u + w = 0 with u ∈ U and w ∈ W, then applying S gives u - w = 0, so u = w = 0. Part (iv): The matrix is block diagonal with an identity block (size dim U) and a negative identity block (size dim W). Part (v): U consists of symmetric matrices A = A^T and W consists of skew-symmetric matrices A = -A^T. A basis for U: the n diagonal matrices E_{ii} plus the (n choose 2) matrices E_{ij} + E_{ji} for i < j. A basis for W: the (n choose 2) matrices E_{ij} - E_{ji} for i < j."
+      },
+      "solution": "Part (i): Let λ be an eigenvalue of S with corresponding eigenvector v ≠ 0, so Sv = λv. Applying S to both sides: S²v = S(λv) = λSv = λ(λv) = λ²v. Since S² = I by hypothesis, we have Iv = λ²v, that is, v = λ²v. Rearranging: (1 - λ²)v = 0. Since v ≠ 0 (eigenvectors are nonzero by definition), we must have 1 - λ² = 0, hence λ² = 1. This gives λ = 1 or λ = -1. Therefore the only possible eigenvalues are 1 and -1.\n\nPart (ii): Suppose v = u + w where u ∈ U and w ∈ W. Since u ∈ U, we have Su = u (u is a 1-eigenvector). Since w ∈ W, we have Sw = -w (w is a (-1)-eigenvector). Applying S to the equation v = u + w:\n  Sv = S(u + w) = Su + Sw = u + (-w) = u - w.\nThus we have the system of two equations:\n  v = u + w\n  Sv = u - w.\nAdding these equations: v + Sv = 2u, so u = (v + Sv)/2.\nSubtracting the second from the first: v - Sv = (u + w) - (u - w) = 2w, so w = (v - Sv)/2.\n\nPart (iii): We verify that u = (v + Sv)/2 ∈ U and w = (v - Sv)/2 ∈ W.\n\nFor u: Apply S to get\n  Su = S((v + Sv)/2) = (Sv + S²v)/2.\nSince S² = I, we have S²v = Iv = v, so\n  Su = (Sv + v)/2 = (v + Sv)/2 = u.\nThus Su = u, which means u ∈ U (u is a 1-eigenvector or u = 0).\n\nFor w: Apply S to get\n  Sw = S((v - Sv)/2) = (Sv - S²v)/2 = (Sv - v)/2 = -(v - Sv)/2 = -w.\nThus Sw = -w, which means w ∈ W (w is a (-1)-eigenvector or w = 0).\n\nNow we prove V = U ⊕ W. We must show:\n(1) V = U + W (every vector in V can be written as a sum of elements from U and W).\n(2) U ∩ W = {0} (the sum is direct).\n\nFor (1): Let v ∈ V be arbitrary. Define u = (v + Sv)/2 and w = (v - Sv)/2. We have just shown that u ∈ U and w ∈ W. Moreover, u + w = (v + Sv)/2 + (v - Sv)/2 = 2v/2 = v. Thus every v ∈ V can be written as u + w with u ∈ U and w ∈ W, so V = U + W.\n\nFor (2): Suppose x ∈ U ∩ W. Then x ∈ U means Sx = x, and x ∈ W means Sx = -x. Therefore x = Sx = -x, which gives 2x = 0, hence x = 0. Thus U ∩ W = {0}.\n\nTherefore V = U ⊕ W.\n\nPart (iv): Let B_U = {u₁, ..., u_k} be a basis for U and B_W = {w₁, ..., w_m} be a basis for W. Consider the ordered basis B = B_U ∪ B_W = {u₁, ..., u_k, w₁, ..., w_m} for V.\n\nFor each u_i ∈ B_U, we have Su_i = u_i = 1·u_i (so the coefficient of u_i is 1 and all other coefficients are 0).\nFor each w_j ∈ B_W, we have Sw_j = -w_j = -1·w_j (so the coefficient of w_j is -1 and all other coefficients are 0).\n\nTherefore the matrix of S with respect to B is\n  [S]_B = diag(1, 1, ..., 1, -1, -1, ..., -1)\nwhere there are dim(U) ones followed by dim(W) negative ones. This is a block diagonal matrix:\n  [S]_B = [I_k    0  ]\n          [0    -I_m]\nwhere I_k is the k×k identity matrix and I_m is the m×m identity matrix.\n\nPart (v): Here V = M_{n×n}(ℝ) and S(A) = A^T (transpose).\n\nFirst, note that S² = I: S²(A) = S(S(A)) = S(A^T) = (A^T)^T = A, so S² is the identity map.\n\nU (the 1-eigenspace): These are matrices A such that S(A) = A, that is, A^T = A. Thus U is the space of symmetric n×n matrices.\n\nW (the (-1)-eigenspace): These are matrices A such that S(A) = -A, that is, A^T = -A. Thus W is the space of skew-symmetric (or antisymmetric) n×n matrices.\n\nDimension count: dim(U) = n(n+1)/2 (there are n diagonal entries plus (n choose 2) = n(n-1)/2 independent entries above the diagonal). dim(W) = n(n-1)/2 (the diagonal must be zero, and there are (n choose 2) independent entries above the diagonal). Note dim(U) + dim(W) = n(n+1)/2 + n(n-1)/2 = n²/2 + n/2 + n²/2 - n/2 = n² = dim(V), confirming V = U ⊕ W.\n\nAn eigenbasis for S: We need a basis B_U for U and a basis B_W for W.\n\nBasis for U (symmetric matrices):\n- The n matrices E_{ii} for 1 ≤ i ≤ n (diagonal matrices with a single 1 at position (i,i)).\n- The n(n-1)/2 matrices E_{ij} + E_{ji} for 1 ≤ i < j ≤ n (symmetric matrices with 1 at positions (i,j) and (j,i)).\n\nBasis for W (skew-symmetric matrices):\n- The n(n-1)/2 matrices E_{ij} - E_{ji} for 1 ≤ i < j ≤ n (skew-symmetric matrices with 1 at position (i,j) and -1 at position (j,i)).\n\nHere E_{ij} denotes the matrix with a 1 in position (i,j) and 0 elsewhere.\n\nThus B = {E_{ii} : 1 ≤ i ≤ n} ∪ {E_{ij} + E_{ji} : 1 ≤ i < j ≤ n} ∪ {E_{ij} - E_{ji} : 1 ≤ i < j ≤ n} is an eigenbasis for S, with eigenvalue 1 for the first n(n+1)/2 basis elements and eigenvalue -1 for the last n(n-1)/2 basis elements.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Let λ be an eigenvalue with eigenvector v. Apply S to Sv = λv to get S²v = λ²v.",
+          "justification": "Standard technique: iterate the linear map to see what constraints the hypothesis S² = I imposes on eigenvalues.",
+          "kb_references": ["linalg_ii_ht2026.ch3.def.2"]
+        },
+        {
+          "step": 2,
+          "action": "Use S² = I to conclude v = λ²v, hence (1 - λ²)v = 0. Since v ≠ 0, deduce λ² = 1.",
+          "justification": "Eigenvectors are nonzero by definition, so the coefficient must vanish.",
+          "kb_references": ["linalg_ii_ht2026.ch3.def.2"]
+        },
+        {
+          "step": 3,
+          "action": "Conclude λ ∈ {1, -1}.",
+          "justification": "λ² = 1 has exactly two real solutions.",
+          "kb_references": []
+        },
+        {
+          "step": 4,
+          "action": "For part (ii), write v = u + w and apply S: Sv = Su + Sw = u - w.",
+          "justification": "Use the defining properties of U and W: Su = u and Sw = -w.",
+          "kb_references": ["linalg_ii_ht2026.ch3.def.2", "linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 5,
+          "action": "Solve the 2×2 system {v = u + w, Sv = u - w} by addition and subtraction to get u = (v + Sv)/2 and w = (v - Sv)/2.",
+          "justification": "Standard linear algebra: solve for u and w in terms of v and Sv.",
+          "kb_references": []
+        },
+        {
+          "step": 6,
+          "action": "Verify S(u) = S((v + Sv)/2) = (Sv + S²v)/2 = (Sv + v)/2 = u, so u ∈ U.",
+          "justification": "Must check that the formula actually gives an element of the 1-eigenspace.",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 7,
+          "action": "Verify S(w) = S((v - Sv)/2) = (Sv - S²v)/2 = (Sv - v)/2 = -w, so w ∈ W.",
+          "justification": "Must check that the formula actually gives an element of the (-1)-eigenspace.",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 8,
+          "action": "Prove V = U + W by showing every v ∈ V decomposes as v = u + w with u = (v + Sv)/2 ∈ U and w = (v - Sv)/2 ∈ W.",
+          "justification": "This shows surjectivity of the map (u, w) ↦ u + w from U × W to V.",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 9,
+          "action": "Prove U ∩ W = {0} by showing that if x ∈ U ∩ W then Sx = x and Sx = -x, so x = -x, hence x = 0.",
+          "justification": "This shows injectivity, establishing that the sum is direct.",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 10,
+          "action": "Conclude V = U ⊕ W.",
+          "justification": "Combining surjectivity and injectivity of the decomposition map.",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 11,
+          "action": "For part (iv), note that S acts as the identity on B_U and as -I on B_W, so [S]_B = diag(I_k, -I_m).",
+          "justification": "The matrix representation with respect to an eigenbasis is diagonal (or block diagonal when eigenspaces are grouped).",
+          "kb_references": ["linalg_ii_ht2026.ch3.prop.2"]
+        },
+        {
+          "step": 12,
+          "action": "For part (v), verify S²(A) = (A^T)^T = A, confirming S² = I for the transpose map.",
+          "justification": "Check that the concrete example satisfies the hypothesis.",
+          "kb_references": []
+        },
+        {
+          "step": 13,
+          "action": "Identify U = {A : A^T = A} (symmetric matrices) and W = {A : A^T = -A} (skew-symmetric matrices).",
+          "justification": "Direct translation of eigenspace definitions to the transpose operation.",
+          "kb_references": []
+        },
+        {
+          "step": 14,
+          "action": "Construct explicit basis for U using E_{ii} (diagonal) and E_{ij} + E_{ji} (off-diagonal symmetric).",
+          "justification": "Standard basis for symmetric matrices derived from elementary matrices.",
+          "kb_references": []
+        },
+        {
+          "step": 15,
+          "action": "Construct explicit basis for W using E_{ij} - E_{ji} (off-diagonal skew-symmetric).",
+          "justification": "Standard basis for skew-symmetric matrices (diagonal entries must be zero).",
+          "kb_references": []
+        },
+        {
+          "step": 16,
+          "action": "Verify dimension count: dim(U) = n(n+1)/2, dim(W) = n(n-1)/2, sum equals n².",
+          "justification": "Consistency check that eigenspaces span the whole space.",
+          "kb_references": []
+        }
+      ],
+      "potential_issues": [
+        "In part (ii), we assume v can be written as u + w. This is justified only after part (iii) proves V = U ⊕ W. The argument is actually circular as stated—we should either (a) phrase part (ii) as 'IF v = u + w THEN find formulas' and use those formulas in part (iii) to prove existence, or (b) recognize that parts (ii) and (iii) together form one complete argument.",
+        "The basis given for U and W in part (v) should be verified to be linearly independent and to span the respective spaces. The dimension counting provides evidence but not a complete proof.",
+        "The problem does not specify whether the field is ℝ or ℂ or arbitrary. Over ℂ, we would still have λ² = 1 giving λ ∈ {1, -1}, but the context suggests real vector spaces (especially given part (v)).",
+        "The argument U ∩ W = {0} assumes characteristic ≠ 2. In characteristic 2, where 2x = 0 for all x, the argument fails. However, the problem context (Linear Algebra II over ℝ) makes this a non-issue."
+      ]
+    }
+  ],
+  "recommended_strategy": "s1",
+  "postmortem": {
+    "key_insight": "An involution (S² = I) always splits a vector space into the ±1 eigenspaces via the projection operators P₊ = (I + S)/2 and P₋ = (I - S)/2. These projections are complementary (P₊ + P₋ = I) and orthogonal (P₊P₋ = 0), giving V = U ⊕ W automatically. The constraint S² = I is equivalent to saying the minimal polynomial of S divides (t-1)(t+1), which forces the eigenvalue-based decomposition.",
+    "transferable_technique": "When you have a linear map satisfying a polynomial relation (here S² = I, i.e., S² - I = 0), factor that polynomial over the base field to identify potential eigenvalues. Then construct projection operators for each eigenvalue using Lagrange interpolation or direct algebraic manipulation. For an involution, the projections are simply (I ± S)/2. This technique generalizes to any polynomial: if p(S) = 0 and p factors as (S - λ₁I)···(S - λₖI), the space decomposes into generalized eigenspaces.",
+    "common_errors": [
+      "Forgetting that eigenvectors are nonzero by definition—the equation (1 - λ²)v = 0 does not imply λ = ±1 unless v ≠ 0.",
+      "Trying to prove V = U ⊕ W before having explicit formulas for the decomposition. The formulas u = (v + Sv)/2 and w = (v - Sv)/2 are essential—they construct the projections.",
+      "In part (v), confusing the basis vectors. The basis for skew-symmetric matrices has NO diagonal elements (since A_{ii} = -A_{ii} implies A_{ii} = 0). Students often mistakenly include diagonal matrices in W.",
+      "Thinking that S must be diagonalizable. In fact, the condition S² = I guarantees diagonalizability over any field where t² - 1 splits (e.g., ℝ or ℂ), because S satisfies a polynomial with distinct roots. But this isn't obvious and should be noted.",
+      "Circular reasoning in parts (ii) and (iii). The formulas in (ii) both DEFINE and VERIFY the decomposition. The logic must be clear: assume v = u + w exists, derive formulas, then use those formulas to prove existence and uniqueness."
+    ],
+    "variant_problems": [
+      "Replace S² = I with S³ = I (cube roots of unity as eigenvalues, relevant over ℂ but not ℝ).",
+      "Consider S² = -I (no real eigenvalues, but over ℂ eigenvalues are ±i).",
+      "Let T: V → V satisfy T² = T (idempotent/projection). Show T splits V into ker(T) and im(T) with eigenvalues 0 and 1.",
+      "Given S: V → V with Sⁿ = I for some n, describe the eigenvalue structure and eigenspace decomposition.",
+      "For the transpose example, compute [S]_B explicitly for n = 2 or n = 3 using the constructed basis and verify it has the block diagonal form.",
+      "Consider the map S: M_{n×n}(ℝ) → M_{n×n}(ℝ) given by S(A) = A^T for complex matrices M_{n×n}(ℂ). How does the eigenspace decomposition change?"
+    ],
+    "deeper_connections": "This problem illustrates the general theory of diagonalization and the spectral theorem. When S² = I, we have a polynomial relation that splits completely over ℝ (unlike, say, S² = -I which requires ℂ). The decomposition V = U ⊕ W is a special case of the general result: if S satisfies p(S) = 0 where p factors into distinct linear factors, then V decomposes into a direct sum of eigenspaces. The projection operators (I ± S)/2 are instances of spectral projections. In part (v), the transpose operator's eigenspaces (symmetric vs skew-symmetric) are fundamental in differential geometry (where they correspond to different types of 2-forms) and in Lie theory (where the Lie algebra of orthogonal matrices consists of skew-symmetric matrices). The dimension count n(n+1)/2 + n(n-1)/2 = n² foreshadows similar decompositions in representation theory. The technique of solving for projection operators via linear systems (part ii) is a discrete version of functional calculus for operators."
+  }
+}

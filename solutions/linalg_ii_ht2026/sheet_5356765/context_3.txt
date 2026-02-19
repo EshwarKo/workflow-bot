@@ -1,0 +1,128 @@
+## Relevant Knowledge Base Entries
+
+### [THEOREM] Gram-Schmidt Orthogonalization Process (linalg_ii_ht2026.ch4.thm.2)  [relevance: 0.638]
+**Statement:** Let v₁, ..., vₖ be independent vectors in R^n (column vectors) or R^n. Then there are orthonormal vectors w₁, ..., wₖ such that, for each 1 ≤ i ≤ k, we have the span of w₁, ..., wᵢ equals the span of v₁, ..., vᵢ.
+**Hypotheses:**
+  - v₁, ..., vₖ are vectors in R^n
+  - The vectors v₁, ..., vₖ are linearly independent
+**Conclusion:** There exist orthonormal vectors w₁, ..., wₖ that span the same nested subspaces as v₁, ..., vᵢ for each i
+**When to use:** Need to convert a basis to an orthonormal basis; Want to orthogonally diagonalize a symmetric matrix with repeated eigenvalues; Need an orthonormal basis for a subspace; Working with inner products and need perpendicular vectors
+**Proof strategy:** Induction on i: at each step, project vᵢ₊₁ onto the orthogonal complement of span(w₁,...,wᵢ) and normalize
+
+### [THEOREM] Gram-Schmidt Orthogonalization Process (linalg_ii_ht2026.ch4.thm.2)  [relevance: 0.638]
+**Statement:** Let v₁, ..., vₖ be independent vectors in R^n (column vectors) or R^n. Then there are orthonormal vectors w₁, ..., wₖ such that, for each 1 ≤ i ≤ k, we have the span of w₁, ..., wᵢ equals the span of v₁, ..., vᵢ.
+**Hypotheses:**
+  - v₁, ..., vₖ are vectors in R^n
+  - The vectors v₁, ..., vₖ are linearly independent
+**Conclusion:** There exist orthonormal vectors w₁, ..., wₖ that span the same nested subspaces as v₁, ..., vᵢ for each i
+**When to use:** Need to convert a basis to an orthonormal basis; Want to orthogonally diagonalize a symmetric matrix with repeated eigenvalues; Need an orthonormal basis for a subspace; Working with inner products and need perpendicular vectors
+**Proof strategy:** Induction on i: at each step, project vᵢ₊₁ onto the orthogonal complement of span(w₁,...,wᵢ) and normalize
+
+### [PROPOSITION] Properties of Eigenvectors and Eigenspaces (linalg_ii_ht2026.ch3.prop.2)  [relevance: 0.588]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) The lambda-eigenvectors of A, together with the zero vector, form a subspace of R to the n column vectors. This is called the lambda eigenspace, usually denoted E_lambda. (b) For 1 less than or equal to i less than or equal to k, let v_i be a lambda_i-eigenvector of A. If lambda_1 through lambda_k are distinct then v_1 through v_k are independent. (c) The distinct eigenspaces of A form a direct sum in R to the n column vectors. This direct sum equals R to the n column vectors if and only if A is diagonalizable.
+**Hypotheses:**
+  - A is an n by n matrix
+**Conclusion:** Eigenspaces are subspaces; eigenvectors for distinct eigenvalues are independent; eigenspaces form a direct sum that equals the whole space exactly when A is diagonalizable
+**When to use:** Need to prove eigenvectors for distinct eigenvalues are independent; Want to understand the structure of the space in terms of eigenspaces; Proving a matrix with n distinct eigenvalues is diagonalizable
+**Proof strategy:** Part (a) uses kernel characterization; part (b) uses induction on number of eigenvectors; part (c) follows from (b)
+
+### [PROPOSITION] Properties of Eigenvectors and Eigenspaces (linalg_ii_ht2026.ch3.prop.2)  [relevance: 0.588]
+**Statement:** Let A be an n by n matrix and lambda in the reals. (a) The lambda-eigenvectors of A, together with the zero vector, form a subspace of R to the n column vectors. This is called the lambda eigenspace, usually denoted E_lambda. (b) For 1 less than or equal to i less than or equal to k, let v_i be a lambda_i-eigenvector of A. If lambda_1 through lambda_k are distinct then v_1 through v_k are independent. (c) The distinct eigenspaces of A form a direct sum in R to the n column vectors. This direct sum equals R to the n column vectors if and only if A is diagonalizable.
+**Hypotheses:**
+  - A is an n by n matrix
+**Conclusion:** Eigenspaces are subspaces; eigenvectors for distinct eigenvalues are independent; eigenspaces form a direct sum that equals the whole space exactly when A is diagonalizable
+**When to use:** Need to prove eigenvectors for distinct eigenvalues are independent; Want to understand the structure of the space in terms of eigenspaces; Proving a matrix with n distinct eigenvalues is diagonalizable
+**Proof strategy:** Part (a) uses kernel characterization; part (b) uses induction on number of eigenvectors; part (c) follows from (b)
+
+### [PROPOSITION] Eigenvectors of Symmetric Matrices are Orthogonal (linalg_ii_ht2026.ch4.prop.2)  [relevance: 0.547]
+**Statement:** Let A be a real n by n symmetric matrix. If v and w are eigenvectors of A with associated eigenvalues lambda and mu, where lambda does not equal mu, then v dot w equals zero.
+**Hypotheses:**
+  - A is a real n by n symmetric matrix
+  - v is an eigenvector of A with eigenvalue lambda
+  - w is an eigenvector of A with eigenvalue mu
+  - lambda does not equal mu (distinct eigenvalues)
+**Conclusion:** v and w are orthogonal: v · w = 0
+**When to use:** Working with a symmetric matrix and want to show eigenvectors are orthogonal; Need to verify that eigenspaces for different eigenvalues are perpendicular; Building an orthonormal eigenbasis and want to skip Gram-Schmidt between eigenspaces
+**Proof strategy:** Use symmetry of A to compute λ(v·w) in two different ways, forcing (λ-μ)(v·w)=0
+
+### [PROPOSITION] Eigenvectors of Symmetric Matrices are Orthogonal (linalg_ii_ht2026.ch4.prop.2)  [relevance: 0.547]
+**Statement:** Let A be a real n by n symmetric matrix. If v and w are eigenvectors of A with associated eigenvalues lambda and mu, where lambda does not equal mu, then v dot w equals zero.
+**Hypotheses:**
+  - A is a real n by n symmetric matrix
+  - v is an eigenvector of A with eigenvalue lambda
+  - w is an eigenvector of A with eigenvalue mu
+  - lambda does not equal mu (distinct eigenvalues)
+**Conclusion:** v and w are orthogonal: v · w = 0
+**When to use:** Working with a symmetric matrix and want to show eigenvectors are orthogonal; Need to verify that eigenspaces for different eigenvalues are perpendicular; Building an orthonormal eigenbasis and want to skip Gram-Schmidt between eigenspaces
+**Proof strategy:** Use symmetry of A to compute λ(v·w) in two different ways, forcing (λ-μ)(v·w)=0
+
+### [THEOREM] Spectral Theorem (informal statement) (linalg_ii_ht2026.ch4.thm.1)  [relevance: 0.544]
+**Statement:** Let A be an n by n symmetric matrix. Then the roots of the characteristic polynomial of A are real and A has an eigenbasis consisting of mutually perpendicular unit vectors. That is, A has an orthonormal eigenbasis.
+**Hypotheses:**
+  - A is an n by n real matrix
+  - A is symmetric, meaning A = A^T
+**Conclusion:** The eigenvalues of A are real, and A has an orthonormal eigenbasis
+**When to use:** Working with a symmetric matrix and need to diagonalize it; Want to understand geometric meaning of a quadratic form; Need to find principal axes of an ellipse, ellipsoid, or other conic/quadric; Analyzing a system where the matrix respects the inner product structure
+
+### [THEOREM] Spectral Theorem (informal statement) (linalg_ii_ht2026.ch4.thm.1)  [relevance: 0.544]
+**Statement:** Let A be an n by n symmetric matrix. Then the roots of the characteristic polynomial of A are real and A has an eigenbasis consisting of mutually perpendicular unit vectors. That is, A has an orthonormal eigenbasis.
+**Hypotheses:**
+  - A is an n by n real matrix
+  - A is symmetric, meaning A = A^T
+**Conclusion:** The eigenvalues of A are real, and A has an orthonormal eigenbasis
+**When to use:** Working with a symmetric matrix and need to diagonalize it; Want to understand geometric meaning of a quadratic form; Need to find principal axes of an ellipse, ellipsoid, or other conic/quadric; Analyzing a system where the matrix respects the inner product structure
+
+### [THEOREM] Fundamental Properties of Determinants (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.544]
+**Statement:** The determinant function defined in Definition 3 has the following properties. (A) det is linear in each row: if matrix C is obtained from matrix A by replacing row i with λ r_i + μ v (where v is another vector), and matrix B is A with row i replaced by v, then det(C) = λ det(A) + μ det(B), holding all other rows fixed. (B) If matrix A has two equal rows (r_i = r_j for i ≠ j), then det A = 0. (B') If matrix B is obtained from A by swapping two different rows, then det B = -det A.
+**Hypotheses:**
+  - det is defined as in Definition 3 (the recursive/inductive definition)
+**Conclusion:** det satisfies multilinearity (property A), vanishes on matrices with repeated rows (property B), and alternates sign under row swaps (property B')
+**When to use:** Proving almost any property of determinants — these are the foundational axioms; Showing det is well-defined under different characterizations; Justifying why row operations affect det in predictable ways; Connecting det to linear dependence (repeated rows → zero det → dependent rows)
+**Proof strategy:** Induction on n for properties (A) and (B), with a lemma showing (A)+(B) ⟺ (A)+(B')
+
+### [THEOREM] Fundamental Properties of Determinants (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.544]
+**Statement:** The determinant function defined in Definition 3 has the following properties. (A) det is linear in each row: if matrix C is obtained from matrix A by replacing row i with λ r_i + μ v (where v is another vector), and matrix B is A with row i replaced by v, then det(C) = λ det(A) + μ det(B), holding all other rows fixed. (B) If matrix A has two equal rows (r_i = r_j for i ≠ j), then det A = 0. (B') If matrix B is obtained from A by swapping two different rows, then det B = -det A.
+**Hypotheses:**
+  - det is defined as in Definition 3 (the recursive/inductive definition)
+**Conclusion:** det satisfies multilinearity (property A), vanishes on matrices with repeated rows (property B), and alternates sign under row swaps (property B')
+**When to use:** Proving almost any property of determinants — these are the foundational axioms; Showing det is well-defined under different characterizations; Justifying why row operations affect det in predictable ways; Connecting det to linear dependence (repeated rows → zero det → dependent rows)
+**Proof strategy:** Induction on n for properties (A) and (B), with a lemma showing (A)+(B) ⟺ (A)+(B')
+
+### [THEOREM] Equality of determinant expansions (linalg_ii_ht2026.ch2.thm.1)  [relevance: 0.544]
+**Statement:** Let A = (a_{ij}) be an n by n matrix and let C_{ij} denote the (i,j)-th cofactor of A. Then the determinant of A may be calculated by expanding along any column or row of A. So, for any i with 1 ≤ i ≤ n, we have det A equals a_{1i}C_{1i} + a_{2i}C_{2i} + ... + a_{ni}C_{ni} (this is expansion along the i-th column), and det A also equals a_{i1}C_{i1} + a_{i2}C_{i2} + ... + a_{in}C_{in} (this is expansion along the i-th row).
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - C_{ij} is the (i,j)-th cofactor of A, defined as (-1)^{i+j} times the determinant of the (n-1) by (n-1) matrix obtained by deleting row i and column j from A
+  - i is any integer with 1 ≤ i ≤ n
+**Conclusion:** The determinant can be computed by cofactor expansion along any row or any column, and all 2n possible expansions give the same value
+**When to use:** asked to compute a determinant and you see a row or column with many zeros — expand along that row/column; need to prove a property of determinants by induction on size — cofactor expansion gives the inductive step; working with block matrices and need to relate det of the whole to det of blocks — cofactor methods can help; see a proof that uses 'expand along the first column' and wonder if other columns work — yes, they all work
+**Proof strategy:** Uniqueness argument using the three characterizing properties of determinants
+
+### [PROPOSITION] Determinant uniquely determined by algebraic properties (linalg_ii_ht2026.ch2.prop.1)  [relevance: 0.527]
+**Statement:** The function det is entirely determined by the three algebraic properties: (i) det is linear in the rows of a matrix, (ii) if a matrix has two equal rows then its determinant is zero, (iii) det I_n = 1. Further, the determinant of an n by n matrix A = (a_{ij}) equals the sum over all permutation matrices P_{i_1...i_n} of (det P_{i_1...i_n}) times (a_{1i_1} times ... times a_{ni_n}), where P_{i_1...i_n} has rows e_{i_1}, ..., e_{i_n}.
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - det satisfies (i) multilinearity in rows, (ii) alternating property, (iii) normalization det I_n = 1
+**Conclusion:** The determinant function is uniquely determined and equals the sum over all permutation matrices of signed monomials
+**When to use:** need to prove a property holds for all determinants by checking it satisfies the three axioms; want to derive an explicit formula for det A from first principles; asked to show that det is the unique function with certain properties; working with abstract multilinear algebra and need a concrete handle on det
+**Proof strategy:** Constructive expansion using multilinearity
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.52]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.52]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [DEFINITION] Eigenvector and Eigenvalue (linalg_ii_ht2026.ch3.def.2)  [relevance: 0.52]
+**Statement:** Let A be an n by n matrix. We say that a nonzero vector v in R to the n of column vectors is an eigenvector of A if A times v equals lambda times v for some scalar lambda. The scalar lambda is called the eigenvalue of v and we will also refer to v as a lambda-eigenvector.
+**Hypotheses:**
+  - A is an n by n matrix
+  - v is a nonzero vector in R to the n of column vectors
+  - There exists a scalar lambda such that A times v equals lambda times v
+**When to use:** Matrix acts along certain directions without rotation; Looking for invariant directions of a transformation; Seeking a basis that diagonalizes a matrix; Understanding the geometric structure of a linear map

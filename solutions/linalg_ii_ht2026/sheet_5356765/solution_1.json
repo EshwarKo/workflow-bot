@@ -1,0 +1,183 @@
+{
+  "problem_id": "problem_1",
+  "problem_statement": "Evaluate the n × n determinant with 2 on the main diagonal, -1 on the super- and sub-diagonals, and 0 elsewhere",
+  "relevant_chapters": [2],
+
+  "classification": {
+    "primary_archetype": "recurrence relation",
+    "secondary_archetypes": ["cofactor expansion", "induction", "eigenvalue computation"],
+    "confidence": 0.95,
+    "reasoning": "This is a tridiagonal determinant problem. The most natural approach is to set up a recurrence relation using cofactor expansion along the first row or column. The tridiagonal structure makes this particularly clean. Alternative approaches include direct eigenvalue computation (this matrix is related to the discrete Laplacian) or proof by induction after guessing the pattern."
+  },
+
+  "strategies": [
+    {
+      "id": "s1",
+      "approach_name": "Recurrence relation via cofactor expansion",
+      "confidence": 0.95,
+      "attack_plan": [
+        "Let D_n denote the determinant of the n×n tridiagonal matrix with the given pattern",
+        "Compute D_1 and D_2 by hand to establish base cases",
+        "Use cofactor expansion along the first row to relate D_n to D_{n-1} and D_{n-2}",
+        "Solve the resulting linear recurrence relation",
+        "Verify the formula matches the base cases"
+      ],
+      "hints": {
+        "tier1_conceptual": "When you have a matrix with a lot of structure (many zeros, repeated pattern), think about how computing the determinant for size n might relate to computing it for smaller sizes. The tridiagonal structure means most cofactors will be simple.",
+        "tier2_strategic": "Use cofactor expansion along the first row (Theorem linalg_ii_ht2026.ch2.thm.1). Because of the zeros, only the first two terms will contribute. The first cofactor will give you D_{n-1}, but what about the second? Look carefully at the structure of that minor - it's almost tridiagonal but has a special form. This should give you a recurrence relation D_n = a·D_{n-1} + b·D_{n-2}.",
+        "tier3_outline": "Let D_n be the determinant. Expanding along the first row: D_n = 2·C_{11} + (-1)·C_{12}, where C_{11} corresponds to deleting row 1 and column 1 (giving D_{n-1}), and C_{12} corresponds to deleting row 1 and column 2. For the second cofactor, the resulting matrix has a special structure: the (1,1) entry is -1, and the rest is (n-2)×(n-2) tridiagonal. Expand along the first column of this to get D_{n-2}. This yields D_n = 2D_{n-1} - D_{n-2}. Compute D_1 = 2, D_2 = 3. The recurrence has characteristic equation r² - 2r + 1 = 0, giving r = 1 (double root). For a double root, the general solution is D_n = (A + Bn)·1^n = A + Bn. Using initial conditions: D_1 = A + B = 2 and D_2 = A + 2B = 3 gives B = 1 and A = 1. Therefore D_n = n + 1."
+      },
+      "solution": "Let D_n denote the determinant of the n×n tridiagonal matrix with 2 on the diagonal and -1 on the super- and sub-diagonals.\n\n**Step 1: Base cases**\nFor n = 1: D_1 = |2| = 2.\nFor n = 2: D_2 = |2  -1| = 2·2 - (-1)·(-1) = 4 - 1 = 3.\n           |-1  2|\n\n**Step 2: Recurrence relation**\nFor n ≥ 3, expand det along the first row using cofactor expansion:\nD_n = 2·C_{11} + (-1)·C_{12} + 0·C_{13} + ... + 0·C_{1n}\n\nwhere C_{1j} = (-1)^{1+j} det(A_{1j}) is the (1,j)-cofactor.\n\nFor C_{11}: deleting row 1 and column 1 leaves the (n-1)×(n-1) tridiagonal matrix of the same form, so C_{11} = (+1)·D_{n-1}.\n\nFor C_{12}: deleting row 1 and column 2 leaves an (n-1)×(n-1) matrix of the form:\n|-1  0   0  ... 0 |\n|-1  2  -1  ... 0 |\n| 0 -1   2  ... 0 |\n| ⋮  ⋮   ⋮  ⋱  ⋮ |\n| 0  0   0  ... 2 |\n\nExpanding this along the first column:\ndet(A_{12}) = (-1)·M_{11} + (-1)·M_{21} = (-1)·D_{n-2} + (-1)·0 = -D_{n-2}\n\nwhere M_{11} is the minor obtained by deleting row 1 and column 1 from A_{12}, which gives the (n-2)×(n-2) tridiagonal matrix, hence has determinant D_{n-2}. The entry M_{21} contributes 0 because the matrix remaining has a zero row.\n\nTherefore C_{12} = (-1)^{1+2}·(-D_{n-2}) = (-1)·(-D_{n-2}) = D_{n-2}.\n\nThus: D_n = 2·D_{n-1} + (-1)·D_{n-2} = 2D_{n-1} - D_{n-2}.\n\n**Step 3: Solve the recurrence**\nThe characteristic equation is r² - 2r + 1 = 0, which factors as (r-1)² = 0.\nThis gives a double root r = 1.\n\nFor a double root, the general solution is D_n = (A + Bn)·1^n = A + Bn.\n\nUsing initial conditions:\nD_1 = A + B = 2\nD_2 = A + 2B = 3\n\nSubtracting: B = 1, so A = 1.\n\n**Step 4: Final answer**\nD_n = n + 1.\n\n**Verification:**\nD_1 = 1 + 1 = 2 ✓\nD_2 = 2 + 1 = 3 ✓\nD_3 = 2·3 - 2 = 4 = 3 + 1 ✓\n\nTherefore, the n×n tridiagonal determinant equals **n + 1**.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Compute base cases D_1 = 2 and D_2 = 3 directly",
+          "justification": "These provide initial conditions for the recurrence relation and are small enough to compute by hand using the explicit formula for 2×2 determinants",
+          "kb_references": ["linalg_ii_ht2026.ch2.prop.1"]
+        },
+        {
+          "step": 2,
+          "action": "Set up recurrence D_n = 2D_{n-1} - D_{n-2} using cofactor expansion along the first row",
+          "justification": "The tridiagonal structure means only the first two entries in row 1 are nonzero, simplifying the expansion significantly. The cofactors correspond to structured submatrices whose determinants can be identified",
+          "kb_references": ["linalg_ii_ht2026.ch2.thm.1", "linalg_ii_ht2026.ch2.def.4"]
+        },
+        {
+          "step": 3,
+          "action": "Identify that C_{11} = D_{n-1} and compute C_{12} by further expansion",
+          "justification": "The (1,1)-cofactor gives an (n-1)×(n-1) matrix of the same tridiagonal form. The (1,2)-cofactor requires careful analysis: expanding along the first column of A_{12} reveals the D_{n-2} term",
+          "kb_references": ["linalg_ii_ht2026.ch2.def.4"]
+        },
+        {
+          "step": 4,
+          "action": "Solve the characteristic equation r² - 2r + 1 = 0 to get r = 1 (double root)",
+          "justification": "Standard technique for linear recurrence relations with constant coefficients. A double root requires the solution form D_n = A + Bn",
+          "kb_references": []
+        },
+        {
+          "step": 5,
+          "action": "Use initial conditions to find A = 1, B = 1, giving D_n = n + 1",
+          "justification": "The two initial conditions D_1 = 2 and D_2 = 3 uniquely determine the two constants A and B in the general solution",
+          "kb_references": []
+        }
+      ],
+      "potential_issues": [
+        "Step 3 requires careful bookkeeping when computing det(A_{12}). The matrix A_{12} has -1 in position (1,1) and -1 in position (2,1), which is atypical. A student might incorrectly assume it's still tridiagonal.",
+        "The characteristic equation technique for solving recurrences is not explicitly in the provided KB entries. This is standard material from a prior course (difference equations or discrete mathematics), but if a student hasn't seen this, they would be stuck.",
+        "The double root case r = 1 requires knowing that the general solution is (A + Bn)r^n, not just Ar^n. This is a subtle point in the theory of linear recurrences."
+      ]
+    },
+    {
+      "id": "s2",
+      "approach_name": "Pattern recognition and proof by induction",
+      "confidence": 0.85,
+      "attack_plan": [
+        "Compute the first few values: D_1, D_2, D_3, D_4 by hand or using the recurrence",
+        "Observe the pattern: D_n = n + 1",
+        "Prove by strong induction that D_n = n + 1 for all n ≥ 1",
+        "Use cofactor expansion to show D_n = 2D_{n-1} - D_{n-2} in the inductive step"
+      ],
+      "hints": {
+        "tier1_conceptual": "Sometimes the fastest way to solve a determinant problem is to compute several small cases, guess a pattern, and then prove it by induction. The pattern for tridiagonal determinants is often simple.",
+        "tier2_strategic": "Compute D_1 = 2, D_2 = 3, D_3 = 4, D_4 = 5. Conjecture that D_n = n + 1. To prove this by induction, you'll need to establish the recurrence relation D_n = 2D_{n-1} - D_{n-2} and use strong induction (requiring both previous cases).",
+        "tier3_outline": "Base cases: D_1 = 2 = 1+1, D_2 = 3 = 2+1. Inductive step: assume D_k = k+1 for all k < n. Show D_n = 2D_{n-1} - D_{n-2} by cofactor expansion (see Strategy 1), then substitute: D_n = 2(n) - (n-1) = 2n - n + 1 = n + 1. Therefore the formula holds for all n."
+      },
+      "solution": "**Conjecture:** D_n = n + 1.\n\n**Proof by strong induction:**\n\n*Base cases:*\nD_1 = 2 = 1 + 1 ✓\nD_2 = 3 = 2 + 1 ✓\n\n*Inductive hypothesis:* Assume D_k = k + 1 for all 1 ≤ k < n.\n\n*Inductive step:* We need to show D_n = n + 1.\n\nBy cofactor expansion along the first row (as in Strategy 1), we have:\nD_n = 2D_{n-1} - D_{n-2}\n\nBy the inductive hypothesis:\nD_{n-1} = (n-1) + 1 = n\nD_{n-2} = (n-2) + 1 = n - 1\n\nTherefore:\nD_n = 2n - (n-1) = 2n - n + 1 = n + 1.\n\nBy strong induction, D_n = n + 1 for all n ≥ 1.\n\n**Answer:** The determinant equals **n + 1**.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Compute D_1 = 2, D_2 = 3 and observe the pattern suggests D_n = n + 1",
+          "justification": "Pattern recognition from small cases guides the conjecture",
+          "kb_references": ["linalg_ii_ht2026.ch2.prop.1"]
+        },
+        {
+          "step": 2,
+          "action": "Establish base cases for induction: D_1 = 2 and D_2 = 3",
+          "justification": "Strong induction requires two base cases since the recurrence relates D_n to both D_{n-1} and D_{n-2}",
+          "kb_references": []
+        },
+        {
+          "step": 3,
+          "action": "Show that D_n = 2D_{n-1} - D_{n-2} using cofactor expansion",
+          "justification": "This recurrence is the key structural property of the tridiagonal matrix. It follows from cofactor expansion along the first row",
+          "kb_references": ["linalg_ii_ht2026.ch2.thm.1"]
+        },
+        {
+          "step": 4,
+          "action": "Apply inductive hypothesis to conclude D_n = 2(n) - (n-1) = n + 1",
+          "justification": "Substituting the inductive hypothesis into the recurrence immediately gives the result",
+          "kb_references": []
+        }
+      ],
+      "potential_issues": [
+        "This approach requires guessing the correct formula D_n = n + 1. A student who doesn't see the pattern might waste time.",
+        "The proof still requires establishing the recurrence relation D_n = 2D_{n-1} - D_{n-2}, which is the technical heart of Strategy 1. So this doesn't really avoid the hard work, it just repackages it.",
+        "Some students might try weak induction (assuming only D_{n-1}) which won't work since the recurrence involves D_{n-2} as well."
+      ]
+    },
+    {
+      "id": "s3",
+      "approach_name": "Eigenvalue approach via matrix diagonalization",
+      "confidence": 0.70,
+      "attack_plan": [
+        "Recognize the matrix as a discrete second-difference operator",
+        "Guess eigenvectors of the form v_k = (sin(kπ/(n+1)), sin(2kπ/(n+1)), ..., sin(nkπ/(n+1)))^T",
+        "Compute the corresponding eigenvalues λ_k = 2 - 2cos(kπ/(n+1))",
+        "Use det(A) = product of eigenvalues",
+        "Show that the product telescopes or simplifies to n + 1"
+      ],
+      "hints": {
+        "tier1_conceptual": "This tridiagonal matrix has a special structure related to difference equations and appears in numerical analysis. Think about what its eigenvalues might be - matrices with regular structure often have explicit eigenvalue formulas.",
+        "tier2_strategic": "The eigenvalues of this matrix are λ_k = 2 - 2cos(kπ/(n+1)) for k = 1, ..., n. You can verify this with the eigenvector v_k having components sin(jkπ/(n+1)). Once you have all eigenvalues, compute their product. There's a classical identity for the product of (1 - cos(kπ/(n+1))) terms that simplifies to n+1.",
+        "tier3_outline": "Verify that v_k = (sin(kπ/(n+1)), sin(2kπ/(n+1)), ..., sin(nkπ/(n+1)))^T is an eigenvector with eigenvalue λ_k = 2 - 2cos(kπ/(n+1)) = 4sin²(kπ/(2(n+1))). The determinant is ∏_{k=1}^n λ_k. Using the identity ∏_{k=1}^n sin(kπ/(n+1)) = (n+1)/2^n and properties of the product, show det(A) = n + 1. This approach is elegant but requires knowledge beyond the provided KB."
+      },
+      "solution": "**Eigenvalue computation (sketch):**\n\nThe n×n tridiagonal matrix T_n with 2 on the diagonal and -1 on the off-diagonals can be shown to have eigenvalues:\n\nλ_k = 2 - 2cos(kπ/(n+1)) for k = 1, 2, ..., n.\n\nThis can be verified by checking that the vectors v_k with j-th component sin(jkπ/(n+1)) are eigenvectors.\n\nThe determinant is the product of eigenvalues:\ndet(T_n) = ∏_{k=1}^n [2 - 2cos(kπ/(n+1))] = 2^n ∏_{k=1}^n [1 - cos(kπ/(n+1))]\n         = 2^n ∏_{k=1}^n 2sin²(kπ/(2(n+1)))\n         = 2^{2n} ∏_{k=1}^n sin²(kπ/(2(n+1)))\n\nUsing the Chebyshev identity:\n∏_{k=1}^n sin(kπ/(n+1)) = (n+1)/2^n\n\nand appropriate manipulation of the double-angle form, we can show:\n\ndet(T_n) = n + 1.\n\n**Note:** This approach is valid but requires trigonometric identities and eigenvalue theory beyond the provided knowledge base. The recurrence approach (Strategy 1) is more elementary and self-contained.",
+      "solution_steps": [
+        {
+          "step": 1,
+          "action": "Identify eigenvalues λ_k = 2 - 2cos(kπ/(n+1))",
+          "justification": "Standard result for tridiagonal Toeplitz matrices. Can be verified by checking eigenvectors",
+          "kb_references": []
+        },
+        {
+          "step": 2,
+          "action": "Write det(T_n) = ∏_{k=1}^n λ_k",
+          "justification": "Determinant equals product of eigenvalues (standard linear algebra fact)",
+          "kb_references": []
+        },
+        {
+          "step": 3,
+          "action": "Simplify the product using trigonometric identities",
+          "justification": "The product of sin terms has a known closed form (Chebyshev identity)",
+          "kb_references": []
+        }
+      ],
+      "potential_issues": [
+        "MAJOR: The eigenvalue formula λ_k = 2 - 2cos(kπ/(n+1)) is NOT in the provided knowledge base. This is a fact that would need to be proven or taken as given from other sources.",
+        "MAJOR: The Chebyshev identity for ∏ sin(kπ/(n+1)) is not in the KB and is non-trivial to prove.",
+        "The computation of the product of eigenvalues to get exactly n+1 requires several steps of trigonometric manipulation that are sketched but not fully detailed here.",
+        "This approach, while elegant and providing insight into the matrix structure, is less accessible than the recurrence method and relies on results outside the course material."
+      ]
+    }
+  ],
+
+  "recommended_strategy": "s1",
+
+  "postmortem": {
+    "key_insight": "The tridiagonal structure creates a beautiful recurrence relation D_n = 2D_{n-1} - D_{n-2}. The double root r=1 in the characteristic equation indicates that the determinant grows linearly rather than exponentially, giving the simple answer D_n = n + 1.",
+    "transferable_technique": "For determinants with heavy structure (tridiagonal, block matrices, many zeros), immediately think: (1) Can I set up a recurrence relation using cofactor expansion? (2) Which row or column has the most zeros? (3) What do the base cases look like? This strategy works for many structured determinant problems and reduces an n×n computation to solving a recurrence.",
+    "common_errors": [
+      "Incorrectly computing det(A_{12}) in the cofactor expansion - the matrix after deleting row 1 and column 2 is NOT tridiagonal, it has -1 in two positions in the first column",
+      "Forgetting that a double root r=1 requires solution form (A + Bn) rather than just A·1^n",
+      "Computing only D_1 as a base case for the recurrence, when you actually need both D_1 and D_2 since the recurrence involves two previous terms",
+      "Trying to use Gaussian elimination to compute the determinant - possible but more tedious than the recurrence approach"
+    ],
+    "variant_problems": [
+      "Change the diagonal entries to a different value (say 3 instead of 2) - the recurrence becomes D_n = 3D_{n-1} - D_{n-2}",
+      "Change the off-diagonal entries to a different value (say -c instead of -1) - gives D_n = 2D_{n-1} - c²D_{n-2}",
+      "Consider a tridiagonal matrix with varying diagonal entries (a_1, a_2, ..., a_n) - leads to a more complex recurrence",
+      "Generalize to a pentadiagonal matrix (nonzero on 5 diagonals) - requires a higher-order recurrence relation",
+      "Ask for the inverse of this matrix rather than its determinant"
+    ],
+    "deeper_connections": "This matrix is the discrete analogue of the second derivative operator d²/dx². It appears when discretizing differential equations (finite difference methods), in the study of random walks on a line, in graph Laplacians for path graphs, and in quantum mechanics (tight-binding model). The eigenvalue approach reveals that this matrix is intimately connected to Fourier analysis: the eigenvectors are discrete sine functions. The fact that det(T_n) = n+1 has a probabilistic interpretation: the number of spanning trees of a path graph with n+1 vertices."
+  }
+}

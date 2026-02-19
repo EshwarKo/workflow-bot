@@ -1,0 +1,6 @@
+{
+  "id": 1,
+  "statement": "Evaluate the \\(n \\times n\\) determinant\n\\[\n\\left|\\begin{array}{cccccc}\n2 & -1 & 0 & 0 & \\cdots & 0 \\\\\n-1 & 2 & -1 & 0 & \\cdots & 0 \\\\\n0 & -1 & 2 & -1 & \\ddots & \\vdots \\\\\n0 & 0 & -1 & \\ddots & \\ddots & 0 \\\\\n\\vdots & \\vdots & \\ddots & \\ddots & 2 & -1 \\\\\n0 & 0 & \\cdots & 0 & -1 & 2\n\\end{array}\\right| .\n\\]",
+  "parts": [],
+  "raw_latex": "Evaluate the \\(n \\times n\\) determinant\n\\[\n\\left|\\begin{array}{cccccc}\n2 & -1 & 0 & 0 & \\cdots & 0 \\\\\n-1 & 2 & -1 & 0 & \\cdots & 0 \\\\\n0 & -1 & 2 & -1 & \\ddots & \\vdots \\\\\n0 & 0 & -1 & \\ddots & \\ddots & 0 \\\\\n\\vdots & \\vdots & \\ddots & \\ddots & 2 & -1 \\\\\n0 & 0 & \\cdots & 0 & -1 & 2\n\\end{array}\\right| .\n\\]"
+}

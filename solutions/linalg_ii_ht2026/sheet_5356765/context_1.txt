@@ -1,0 +1,117 @@
+## Relevant Knowledge Base Entries
+
+### [THEOREM] Equality of determinant expansions (linalg_ii_ht2026.ch2.thm.1)  [relevance: 1.0]
+**Statement:** Let A = (a_{ij}) be an n by n matrix and let C_{ij} denote the (i,j)-th cofactor of A. Then the determinant of A may be calculated by expanding along any column or row of A. So, for any i with 1 ≤ i ≤ n, we have det A equals a_{1i}C_{1i} + a_{2i}C_{2i} + ... + a_{ni}C_{ni} (this is expansion along the i-th column), and det A also equals a_{i1}C_{i1} + a_{i2}C_{i2} + ... + a_{in}C_{in} (this is expansion along the i-th row).
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - C_{ij} is the (i,j)-th cofactor of A, defined as (-1)^{i+j} times the determinant of the (n-1) by (n-1) matrix obtained by deleting row i and column j from A
+  - i is any integer with 1 ≤ i ≤ n
+**Conclusion:** The determinant can be computed by cofactor expansion along any row or any column, and all 2n possible expansions give the same value
+**When to use:** asked to compute a determinant and you see a row or column with many zeros — expand along that row/column; need to prove a property of determinants by induction on size — cofactor expansion gives the inductive step; working with block matrices and need to relate det of the whole to det of blocks — cofactor methods can help; see a proof that uses 'expand along the first column' and wonder if other columns work — yes, they all work
+**Proof strategy:** Uniqueness argument using the three characterizing properties of determinants
+
+### [THEOREM] Singular Value Decomposition (linalg_ii_ht2026.ch4.thm.1)  [relevance: 1.0]
+**Statement:** Let A be an m by n matrix of rank r. Then there exist an orthogonal m by m matrix P and an orthogonal n by n matrix Q such that PAQ equals a block matrix with D in the top-left corner and zeros elsewhere, where D is an invertible diagonal r by r matrix with positive entries listed in decreasing order.
+**Hypotheses:**
+  - A is an m by n matrix
+  - A has rank r
+**Conclusion:** There exist orthogonal matrices P (m by m) and Q (n by n) such that PAQ is in block diagonal form with a positive diagonal matrix D of size r by r in the top-left block and zeros elsewhere
+**When to use:** Need to analyze a non-square matrix or rank-deficient matrix; Problem involves least squares, data compression, or low-rank approximation; Need to compute the pseudoinverse or find closest rank-k approximation; Want to understand the geometric action of a linear transformation; Numerical computation requiring stable matrix factorization; Principal component analysis or dimensionality reduction
+**Proof strategy:** Apply spectral theorem to the symmetric matrix A^T A, construct P1 from the eigenvector decomposition, then extend to full orthogonal matrix P
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.894]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [DEFINITION] Quadratic Form (linalg_ii_ht2026.ch4.def.3)  [relevance: 0.894]
+**Statement:** A quadratic form in n variables x₁, x₂, ..., xₙ is a polynomial where each term has degree two. That is, it can be written as a sum of aᵢⱼ xᵢ xⱼ over i ≤ j, where the aᵢⱼ are scalars. Thus a quadratic form in two variables x, y is a x squared plus b x y plus c y squared where a, b, c are scalars. The following is a coordinate-free way of defining quadratic forms. A quadratic form on a vector space V equals B(v,v) where B: V × V → R is a bilinear map. The connection with symmetric matrices is that we can write the sum as x transpose A x, where x is the column vector of variables and A is a symmetric matrix with diagonal entries aᵢᵢ and off-diagonal entries (1/2)aᵢⱼ.
+**Hypotheses:**
+  - Variables x₁, ..., xₙ or vector space V
+**When to use:** Working with degree 2 polynomials in multiple variables; Analyzing conics or quadrics; Studying second-order behavior (Hessians, curvature); Optimization with quadratic objectives
+
+### [PROPOSITION] Determinant Formulas for 2×2 and 3×3 Matrices (linalg_ii_ht2026.ch2.prop.1)  [relevance: 0.878]
+**Statement:** The determinants of 2×2 and 3×3 matrices are given by the following formulas. (a) For a 2×2 matrix with entries a_11, a_12 in the first row and a_21, a_22 in the second row, the determinant equals a_11 a_22 minus a_12 a_21. (b) For a 3×3 matrix, the determinant equals the sum of three 'left-to-right diagonal' products (a_11 a_22 a_33, a_12 a_23 a_31, a_13 a_21 a_32) minus the sum of three 'right-to-left diagonal' products (a_12 a_21 a_33, a_13 a_22 a_31, a_11 a_23 a_32).
+**Conclusion:** Explicit formulas for 2×2 and 3×3 determinants
+**When to use:** Computing 2×2 or 3×3 determinants by hand; Verifying invertibility of small matrices; Quick checks of determinant properties for small examples; Deriving the geometric interpretation (area/volume scaling)
+**Proof strategy:** Direct application of the inductive definition (Definition 3) to expand determinants and simplify
+
+### [PROPOSITION] Determinant Formulas for 2×2 and 3×3 Matrices (linalg_ii_ht2026.ch2.prop.1)  [relevance: 0.878]
+**Statement:** The determinants of 2×2 and 3×3 matrices are given by the following formulas. (a) For a 2×2 matrix with entries a_11, a_12 in the first row and a_21, a_22 in the second row, the determinant equals a_11 a_22 minus a_12 a_21. (b) For a 3×3 matrix, the determinant equals the sum of three 'left-to-right diagonal' products (a_11 a_22 a_33, a_12 a_23 a_31, a_13 a_21 a_32) minus the sum of three 'right-to-left diagonal' products (a_12 a_21 a_33, a_13 a_22 a_31, a_11 a_23 a_32).
+**Conclusion:** Explicit formulas for 2×2 and 3×3 determinants
+**When to use:** Computing 2×2 or 3×3 determinants by hand; Verifying invertibility of small matrices; Quick checks of determinant properties for small examples; Deriving the geometric interpretation (area/volume scaling)
+**Proof strategy:** Direct application of the inductive definition (Definition 3) to expand determinants and simplify
+
+### [THEOREM] Existence of the Adjugate (linalg_ii_ht2026.ch2.thm.2)  [relevance: 0.796]
+**Statement:** Let A be an n by n matrix. Let C_{ij} denote the (i,j)-th cofactor of A and let C be the matrix of cofactors. Then C^T times A equals A times C^T equals (det A) times I_n. In particular, if A is invertible, then A inverse equals C^T divided by det A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - C is the n by n matrix of cofactors, where C_{ij} = (-1)^{i+j} det(A with row i and column j deleted)
+  - For the inverse formula, A is invertible (equivalently, det A ≠ 0)
+**Conclusion:** The transpose of the cofactor matrix satisfies C^T A = A C^T = (det A) I_n, giving an explicit formula for A^{-1} when A is invertible
+**When to use:** need an explicit formula for the inverse of a matrix — adjugate formula works but is inefficient; asked to invert a symbolic matrix (with parameters) where row reduction is messy — cofactors might be cleaner; proving a theoretical result about inverses — adj(A) = (det A) A^{-1} is useful; see a matrix equation involving cofactors — likely related to adjugate; working with 2×2 or 3×3 matrices by hand — adjugate formula is practical for small sizes
+**Proof strategy:** Direct computation of the (i,j)-entry of C^T A using cofactor expansions and a trick involving auxiliary matrices
+
+### [THEOREM] Existence of the Adjugate (linalg_ii_ht2026.ch2.thm.2)  [relevance: 0.796]
+**Statement:** Let A be an n by n matrix. Let C_{ij} denote the (i,j)-th cofactor of A and let C be the matrix of cofactors. Then C^T times A equals A times C^T equals (det A) times I_n. In particular, if A is invertible, then A inverse equals C^T divided by det A.
+**Hypotheses:**
+  - A is an n by n matrix
+  - C is the n by n matrix of cofactors, where C_{ij} = (-1)^{i+j} det(A with row i and column j deleted)
+  - For the inverse formula, A is invertible (equivalently, det A ≠ 0)
+**Conclusion:** The transpose of the cofactor matrix satisfies C^T A = A C^T = (det A) I_n, giving an explicit formula for A^{-1} when A is invertible
+**When to use:** need an explicit formula for the inverse of a matrix — adjugate formula works but is inefficient; asked to invert a symbolic matrix (with parameters) where row reduction is messy — cofactors might be cleaner; proving a theoretical result about inverses — adj(A) = (det A) A^{-1} is useful; see a matrix equation involving cofactors — likely related to adjugate; working with 2×2 or 3×3 matrices by hand — adjugate formula is practical for small sizes
+**Proof strategy:** Direct computation of the (i,j)-entry of C^T A using cofactor expansions and a trick involving auxiliary matrices
+
+### [LEMMA] Determinants of Elementary Matrices and Their Effect (linalg_ii_ht2026.ch2.lem.2)  [relevance: 0.78]
+**Statement:** (a) The determinants of the elementary matrices are: det(M_i(λ)) = λ, det(S_ij) = -1, and det(A_ij(λ)) = 1. In particular, all elementary matrices are invertible (nonzero determinant). (b) If E is an elementary matrix and A is any n×n matrix, then det(EA) = det(E) det(A). (c) If E is an elementary matrix, then det(E^T) = det(E) (elementary matrices have the same determinant as their transpose).
+**Hypotheses:**
+  - E is an elementary matrix (one of M_i(λ), S_ij, A_ij(λ))
+  - A is an n×n matrix
+**Conclusion:** (a) Explicit determinant values for elementary matrices. (b) Product rule det(EA) = det(E)det(A) for elementary E. (c) Transpose rule det(E^T) = det(E) for elementary E.
+**When to use:** Computing determinants via Gaussian elimination / row reduction; Proving the general product rule det(AB) = det(A)det(B); Proving the transpose rule det(A^T) = det(A); Understanding how EROs affect determinants
+**Proof strategy:** For each type of elementary matrix, verify (a) and (b) using Theorem 13 and Corollary 15. Part (c) follows by direct inspection.
+
+### [LEMMA] Determinants of Elementary Matrices and Their Effect (linalg_ii_ht2026.ch2.lem.2)  [relevance: 0.78]
+**Statement:** (a) The determinants of the elementary matrices are: det(M_i(λ)) = λ, det(S_ij) = -1, and det(A_ij(λ)) = 1. In particular, all elementary matrices are invertible (nonzero determinant). (b) If E is an elementary matrix and A is any n×n matrix, then det(EA) = det(E) det(A). (c) If E is an elementary matrix, then det(E^T) = det(E) (elementary matrices have the same determinant as their transpose).
+**Hypotheses:**
+  - E is an elementary matrix (one of M_i(λ), S_ij, A_ij(λ))
+  - A is an n×n matrix
+**Conclusion:** (a) Explicit determinant values for elementary matrices. (b) Product rule det(EA) = det(E)det(A) for elementary E. (c) Transpose rule det(E^T) = det(E) for elementary E.
+**When to use:** Computing determinants via Gaussian elimination / row reduction; Proving the general product rule det(AB) = det(A)det(B); Proving the transpose rule det(A^T) = det(A); Understanding how EROs affect determinants
+**Proof strategy:** For each type of elementary matrix, verify (a) and (b) using Theorem 13 and Corollary 15. Part (c) follows by direct inspection.
+
+### [PROPOSITION] Determinant uniquely determined by algebraic properties (linalg_ii_ht2026.ch2.prop.1)  [relevance: 0.78]
+**Statement:** The function det is entirely determined by the three algebraic properties: (i) det is linear in the rows of a matrix, (ii) if a matrix has two equal rows then its determinant is zero, (iii) det I_n = 1. Further, the determinant of an n by n matrix A = (a_{ij}) equals the sum over all permutation matrices P_{i_1...i_n} of (det P_{i_1...i_n}) times (a_{1i_1} times ... times a_{ni_n}), where P_{i_1...i_n} has rows e_{i_1}, ..., e_{i_n}.
+**Hypotheses:**
+  - A is an n by n matrix with entries a_{ij}
+  - det satisfies (i) multilinearity in rows, (ii) alternating property, (iii) normalization det I_n = 1
+**Conclusion:** The determinant function is uniquely determined and equals the sum over all permutation matrices of signed monomials
+**When to use:** need to prove a property holds for all determinants by checking it satisfies the three axioms; want to derive an explicit formula for det A from first principles; asked to show that det is the unique function with certain properties; working with abstract multilinear algebra and need a concrete handle on det
+**Proof strategy:** Constructive expansion using multilinearity
+
+### [DEFINITION] Determinant (linalg_ii_ht2026.ch2.def.2)  [relevance: 0.715]
+**Statement:** The determinant of a 1×1 matrix (a_11) is simply a_11 itself. The determinant det A of an n×n matrix A equals a_11 det(A_11) - a_21 det(A_21) + a_31 det(A_31) - ... + (-1)^(n+1) a_n1 det(A_n1), where the sum alternates in sign and runs over all rows i from 1 to n, taking the entry a_i1 from the first column times the determinant of the minor A_i1.
+**Hypotheses:**
+  - A is an n×n square matrix
+**When to use:** Need a rigorous, unambiguous definition of determinant; Computing determinants of small matrices by hand; Proving properties of determinants by induction; Setting up cofactor expansion
+
+### [DEFINITION] Cofactor (linalg_ii_ht2026.ch2.def.4)  [relevance: 0.715]
+**Statement:** Let A be an n×n matrix. For integers I, J between 1 and n, the (I,J)-th cofactor of A, denoted C_IJ(A) or C_IJ, is defined as C_IJ = (-1)^(I+J) det(A_IJ), where A_IJ is the minor obtained by removing row I and column J. Using cofactors, the determinant det A can be rewritten as a_11 C_11 + a_21 C_21 + ... + a_n1 C_n1, which is the sum over the first column of each entry times its cofactor.
+**Hypotheses:**
+  - A is an n×n square matrix
+  - I and J are integers with 1 ≤ I, J ≤ n
+**When to use:** Rewriting determinants in terms of cofactors; Preparing for cofactor expansion along any row or column; Deriving the adjugate matrix or inverse formula; Cramer's rule for solving linear systems
+
+### [DEFINITION] Determinant (linalg_ii_ht2026.ch2.def.2)  [relevance: 0.715]
+**Statement:** The determinant of a 1×1 matrix (a_11) is simply a_11 itself. The determinant det A of an n×n matrix A equals a_11 det(A_11) - a_21 det(A_21) + a_31 det(A_31) - ... + (-1)^(n+1) a_n1 det(A_n1), where the sum alternates in sign and runs over all rows i from 1 to n, taking the entry a_i1 from the first column times the determinant of the minor A_i1.
+**Hypotheses:**
+  - A is an n×n square matrix
+**When to use:** Need a rigorous, unambiguous definition of determinant; Computing determinants of small matrices by hand; Proving properties of determinants by induction; Setting up cofactor expansion
+
+### [DEFINITION] Cofactor (linalg_ii_ht2026.ch2.def.4)  [relevance: 0.715]
+**Statement:** Let A be an n×n matrix. For integers I, J between 1 and n, the (I,J)-th cofactor of A, denoted C_IJ(A) or C_IJ, is defined as C_IJ = (-1)^(I+J) det(A_IJ), where A_IJ is the minor obtained by removing row I and column J. Using cofactors, the determinant det A can be rewritten as a_11 C_11 + a_21 C_21 + ... + a_n1 C_n1, which is the sum over the first column of each entry times its cofactor.
+**Hypotheses:**
+  - A is an n×n square matrix
+  - I and J are integers with 1 ≤ I, J ≤ n
+**When to use:** Rewriting determinants in terms of cofactors; Preparing for cofactor expansion along any row or column; Deriving the adjugate matrix or inverse formula; Cramer's rule for solving linear systems

@@ -1,0 +1,15 @@
+{
+  "id": 2,
+  "statement": "Let \\(J\\) be the \\(n \\times n\\) matrix all of whose entries are 1 .\\\\\n(i) Determine \\(\\chi_{J}\\) and show that there are two eigenvalues, 0 and \\(n\\).\\\\\n(ii) Find the corresponding eigenspaces. Is \\(J\\) diagonalizable?",
+  "parts": [
+    {
+      "label": "i",
+      "statement": "Determine \\(\\chi_{J}\\) and show that there are two eigenvalues, 0 and \\(n\\).\\\\"
+    },
+    {
+      "label": "ii",
+      "statement": "Find the corresponding eigenspaces. Is \\(J\\) diagonalizable?"
+    }
+  ],
+  "raw_latex": "Let \\(J\\) be the \\(n \\times n\\) matrix all of whose entries are 1 .\\\\\n(i) Determine \\(\\chi_{J}\\) and show that there are two eigenvalues, 0 and \\(n\\).\\\\\n(ii) Find the corresponding eigenspaces. Is \\(J\\) diagonalizable?"
+}
