@@ -144,6 +144,16 @@ _UNICODE_MISC = {
     '\u239b': '(', '\u239c': '(', '\u239d': '(',  # ⎛ ⎜ ⎝
     '\u239e': ')', '\u239f': ')', '\u23a0': ')',  # ⎞ ⎟ ⎠
     '\u22c5': '\\cdot', '\u2022': '\\bullet',  # · •
+    # Dashes and quotation marks
+    '\u2014': '---', '\u2013': '--',  # — –  (em/en dashes)
+    '\u2018': '`', '\u2019': "'",  # ' '  (curly single quotes)
+    '\u201c': '``', '\u201d': "''",  # " "  (curly double quotes)
+    '\u2032': "'", '\u2033': "''",  # ′ ″  (prime marks)
+    '\u2010': '-', '\u2011': '-', '\u2012': '-',  # various hyphens
+    '\u00a0': '~',  # non-breaking space
+    '\u2009': '\\,', '\u200a': '',  # thin/hair space
+    '\u200b': '', '\u200c': '', '\u200d': '',  # zero-width chars
+    '\ufeff': '',  # BOM
 }
 
 # Characters that signal "this must be in math mode"
@@ -217,6 +227,13 @@ def _unicode_to_latex(text: str) -> str:
 
     # Replace double-struck and other symbol characters
     for uchar, cmd in _UNICODE_SYMBOLS.items():
+        # If cmd is a \command, use re.sub to add space before following letters
+        if cmd.startswith('\\') and cmd[1:].isalpha():
+            result = re.sub(
+                re.escape(uchar) + r'(?=[A-Za-z])',
+                cmd.replace('\\', '\\\\') + ' ',
+                result,
+            )
         result = result.replace(uchar, cmd)
 
     # Replace box-drawing / bracket characters
@@ -445,6 +462,16 @@ def text_to_latex(text: str) -> str:
 
     # ── Pre-processing: normalise Unicode math & wrap bare math ──────
     result = _unicode_to_latex(result)
+
+    # Escape underscores in reference-like identifiers (e.g.
+    # "linalg_ii_ht2026.ch3.prop.2") BEFORE math wrapping, so they
+    # aren't mistaken for subscripts.
+    result = re.sub(
+        r'([A-Za-z]\w*(?:_\w+)+(?:\.\w+)+)',
+        lambda m: m.group(0).replace('_', r'\_'),
+        result,
+    )
+
     result = _wrap_bare_math(result)
     result = _sanitize_non_ascii(result)
 
