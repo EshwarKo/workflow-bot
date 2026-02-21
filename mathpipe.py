@@ -458,13 +458,17 @@ async def _generate_sheet_output(
     sheet_id: int,
 ) -> None:
     """Generate the final output document for a processed sheet."""
-    system_prompt = load_prompt("output_prompt")
+    # For solution_guide mode, use the dedicated prompt; otherwise the general output prompt
+    if mode == "solution_guide":
+        system_prompt = load_prompt("solution_guide_prompt")
+    else:
+        system_prompt = load_prompt("output_prompt")
 
     # Collect all solution and verification files
     solution_files = sorted(work_dir.glob("solution_*.json"))
     verification_files = sorted(work_dir.glob("verification_*.json"))
 
-    output_ext = {"hints": "md", "study": "md", "anki": "csv", "tricks": "jsonl"}
+    output_ext = {"hints": "md", "study": "md", "anki": "csv", "tricks": "jsonl", "solution_guide": "md"}
     output_file = work_dir / f"output_{mode}.{output_ext.get(mode, 'md')}"
 
     task_message = f"""Generate {mode} mode output for problem sheet {sheet_id}.
@@ -478,12 +482,15 @@ async def _generate_sheet_output(
 Read all solution files (and verification files if present), then generate the output in {mode} mode as specified in your system prompt.
 Write the result to `{output_file.name}`. No wrapping markdown fences — write the raw format."""
 
+    # Solution guide mode is more intensive — needs more turns for the detailed narrative
+    turns = 60 if mode == "solution_guide" else 40
+
     await run_agent(
         system_prompt=system_prompt,
         task_message=task_message,
         cwd=work_dir,
         model=model,
-        max_turns=40,
+        max_turns=turns,
     )
 
     if output_file.exists():
@@ -611,8 +618,8 @@ Examples:
     sheet_p.add_argument("--output-dir", type=Path, default=Path("./solutions"), help="Solutions output dir")
     sheet_p.add_argument("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted)")
     sheet_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
-    sheet_p.add_argument("--mode", choices=["hints", "study", "full"], default="hints",
-                         help="Output mode: hints (progressive disclosure), study (full notes), full (everything)")
+    sheet_p.add_argument("--mode", choices=["hints", "study", "solution_guide", "full"], default="hints",
+                         help="Output mode: hints (progressive disclosure), study (full notes), solution_guide (deep intuition), full (everything)")
     sheet_p.add_argument("--skip-verify", action="store_true", help="Skip verification step")
 
     # ── export ──

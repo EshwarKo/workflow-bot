@@ -165,6 +165,26 @@ This implements the **struggle-first protocol**: each tier is hidden behind a di
 
 ---
 
+### MODE: solution_guide
+
+Generate a **solution guide** — the most pedagogically ambitious output mode. The goal is to give a student ALL the intuition they would have gained from struggling through each problem for hours.
+
+For this mode, load and follow the detailed instructions in the file `solution_guide_prompt.md` in the prompts directory. If that file is not available, use the `hints` mode as a fallback but include a postmortem section for each problem.
+
+The output is a single Markdown file covering the entire problem sheet.
+
+**Key sections per problem:**
+- "What This Problem Is Really Asking" — plain-language restatement of the essential difficulty
+- "Before You Read the Solution — The Struggle Guide" — simulates the experience of being stuck: names the first instinct, shows where naive attempts stall, frames the key insight as a question
+- "The Insight" — the aha moment, stated boldly, then explained: why it's hard to see and what would have led you to it
+- "The Solution" — clean and rigorous, but every non-trivial step annotated with strategic reasoning (*Why this step:*)
+- "What Could Go Wrong" — 2-3 realistic mistakes walked through in detail
+- "What To Remember" — one-liner, pattern recognition trigger, deeper connection
+
+**End with sheet-level patterns:** what themes recur, what the sheet is designed to teach as a whole, 3 key takeaways.
+
+---
+
 ### General Rules
 
 1. **Write for understanding, not for completeness.** Every sentence should make the reader smarter. If it doesn't, cut it.
