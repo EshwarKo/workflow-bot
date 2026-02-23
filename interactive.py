@@ -21,6 +21,21 @@ from rich.table import Table
 
 console = Console()
 
+# ── Vim-style keybindings (j/k alongside arrows + Ctrl-N/P) ──────
+
+VIM_KB = {
+    "down": [
+        {"key": "down"},
+        {"key": "c-n"},
+        {"key": "j"},
+    ],
+    "up": [
+        {"key": "up"},
+        {"key": "c-p"},
+        {"key": "k"},
+    ],
+}
+
 
 # ── Session state ─────────────────────────────────────────────────
 
@@ -75,6 +90,7 @@ def _ask_config(session: Session) -> bool:
         picked = inquirer.select(
             message="Select config file:",
             choices=choices,
+            keybindings=VIM_KB,
         ).execute()
         if picked == "Enter path manually...":
             picked = inquirer.filepath(
@@ -119,6 +135,7 @@ def _ask_sheet(session: Session) -> bool:
         picked = inquirer.select(
             message="Select problem sheet:",
             choices=choices,
+            keybindings=VIM_KB,
         ).execute()
         if picked == "Enter path manually...":
             picked = inquirer.filepath(
@@ -155,6 +172,7 @@ def _ask_model(session: Session) -> str:
         message="Model:",
         choices=list(MODELS.keys()),
         default=session.model,
+        keybindings=VIM_KB,
     ).execute()
     session.model = model
     return model
@@ -177,6 +195,7 @@ def _ask_problems(session: Session) -> list[int] | None:
         message="Which problems?",
         choices=["All problems", "Pick specific problems"],
         default="All problems",
+        keybindings=VIM_KB,
     ).execute()
 
     if select_mode == "All problems":
@@ -192,6 +211,7 @@ def _ask_problems(session: Session) -> list[int] | None:
     selected = inquirer.checkbox(
         message="Select problems (space to toggle, enter to confirm):",
         choices=choices,
+        keybindings=VIM_KB,
     ).execute()
 
     return selected if selected else None
@@ -549,6 +569,7 @@ def _action_generate(session: Session) -> None:
             {"name": "tricks         Transferable technique bank (JSONL)", "value": "tricks"},
         ],
         default="solution_guide",
+        keybindings=VIM_KB,
     ).execute()
 
     model = _ask_model(session)
@@ -589,7 +610,7 @@ def _action_kb(session: Session) -> None:
     tex_files = _find_files("*.tex")
     if tex_files:
         choices = tex_files + [Separator(), "Enter path manually..."]
-        picked = inquirer.select(message="LaTeX source file:", choices=choices).execute()
+        picked = inquirer.select(message="LaTeX source file:", choices=choices, keybindings=VIM_KB).execute()
         if picked == "Enter path manually...":
             picked = inquirer.filepath(
                 message="Source path:", validate=lambda x: Path(x).exists(), only_files=True,
@@ -626,6 +647,7 @@ def _action_kb(session: Session) -> None:
     selected = inquirer.checkbox(
         message="Select chapters (space to toggle, enter for all):",
         choices=ch_choices,
+        keybindings=VIM_KB,
     ).execute()
 
     if not selected:
@@ -675,6 +697,7 @@ def _action_settings(session: Session) -> None:
             {"name": f"Config         (current: {session.config_path or 'not set'})", "value": "config"},
             {"name": f"Sheet          (current: {session.sheet_path or 'not set'}, ID {session.sheet_id})", "value": "sheet"},
         ],
+        keybindings=VIM_KB,
     ).execute()
 
     if setting == "model":
@@ -761,6 +784,7 @@ def run_interactive() -> None:
                 default="parse" if not session.config else None,
                 pointer="\u25b8",
                 show_cursor=False,
+                keybindings=VIM_KB,
             ).execute()
         except (KeyboardInterrupt, EOFError):
             break
