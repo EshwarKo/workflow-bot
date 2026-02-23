@@ -413,21 +413,33 @@ MODEL_NAMES = list(MODELS.keys())
 def cli(ctx):
     """MathPipe — Autonomous Mathematics Learning Pipeline.
 
-    Human-in-the-loop workflow: run each step individually and inspect
-    intermediate outputs, or run the full pipeline end-to-end.
+    Run without a command to launch interactive mode with arrow-key navigation.
 
     \b
-    Step-by-step:           Full pipeline:
-      mathpipe parse          mathpipe sheet
-      mathpipe route          mathpipe kb
-      mathpipe solve          mathpipe export
-      mathpipe verify
-      mathpipe generate
-      mathpipe status
+    Interactive:              Step-by-step:           Full pipeline:
+      mathpipe                  mathpipe parse          mathpipe sheet
+      mathpipe interactive      mathpipe route          mathpipe kb
+                                mathpipe solve          mathpipe export
+                                mathpipe verify
+                                mathpipe generate
+                                mathpipe status
     """
     if ctx.invoked_subcommand is None:
-        _banner()
-        console.print(ctx.get_help())
+        from interactive import run_interactive
+        run_interactive()
+
+
+# ── interactive ───────────────────────────────────────────────────
+
+
+@cli.command()
+def interactive():
+    """Launch interactive mode with arrow-key navigation.
+
+    Persistent shell that remembers your config and sheet between steps.
+    """
+    from interactive import run_interactive
+    run_interactive()
 
 
 # ── parse ─────────────────────────────────────────────────────────
