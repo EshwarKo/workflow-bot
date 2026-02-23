@@ -6,31 +6,39 @@ MathPipe: Autonomous Mathematics Learning Pipeline
 Converts LaTeX lecture notes and problem sheets into structured,
 confidence-graded study materials with genuine mathematical intuition.
 
-Commands:
-    kb      Build knowledge base from LaTeX source
-    sheet   Process a problem sheet (route → solve → verify → output)
-    export  Generate study materials (study notes, Anki cards, trick bank)
+Human-in-the-loop workflow — run each step individually and inspect
+intermediate outputs, or run the full pipeline end-to-end.
 
 Usage:
-    python mathpipe.py kb    --config config/course.yaml --source notes.tex
-    python mathpipe.py sheet --config config/course.yaml --sheet sheet1.tex
-    python mathpipe.py export --config config/course.yaml --format study
+    python mathpipe.py parse    --config config/course.yaml --sheet sheet1.tex
+    python mathpipe.py route    --config config/course.yaml --sheet-id 1
+    python mathpipe.py solve    --config config/course.yaml --sheet-id 1
+    python mathpipe.py verify   --config config/course.yaml --sheet-id 1
+    python mathpipe.py generate --config config/course.yaml --sheet-id 1 --mode hints
+    python mathpipe.py status   --config config/course.yaml --sheet-id 1
+    python mathpipe.py sheet    --config config/course.yaml --sheet sheet1.tex
+    python mathpipe.py kb       --config config/course.yaml --source notes.tex
+    python mathpipe.py export   --config config/course.yaml --format study
 """
 
-import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 import traceback
 from pathlib import Path
 from typing import Any
 
+import click
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from agent_session import MODELS, load_prompt, run_agent
 from config_loader import load_course_config, CourseConfig
-from latex_parser import split_into_chapters, extract_preamble
 from kb_writer import (
     ensure_kb_dir,
     ensure_solutions_dir,
@@ -39,16 +47,105 @@ from kb_writer import (
     read_jsonl,
     write_json,
 )
-from sheet_parser import parse_sheet, format_problem_for_display
+from latex_parser import split_into_chapters, extract_preamble
+from pipeline_state import (
+    STEPS,
+    init_state,
+    load_state,
+    mark_step,
+    save_state,
+)
 from router import load_full_kb, route_sheet, format_context_bundle
+from sheet_parser import parse_sheet, format_problem_for_display
 
 load_dotenv()
 
+console = Console()
 
-# ── KB BUILD PIPELINE ──────────────────────────────────────────────
+# ── Branding ──────────────────────────────────────────────────────
+
+LOGO = r"""[bold cyan]
+    __  ___      __  __    ____  _
+   /  |/  /___ _/ /_/ /_  / __ \(_)___  ___
+  / /|_/ / __ `/ __/ __ \/ /_/ / / __ \/ _ \
+ / /  / / /_/ / /_/ / / / ____/ / /_/ /  __/
+/_/  /_/\__,_/\__/_/ /_/_/   /_/ .___/\___/
+                              /_/[/]"""
+
+TAGLINE = "[dim]Mathematics Learning Pipeline — human-in-the-loop[/dim]"
 
 
-async def run_kb_extraction(
+def _banner() -> None:
+    console.print(LOGO)
+    console.print(f"  {TAGLINE}\n")
+
+
+# ── Helpers ───────────────────────────────────────────────────────
+
+
+def _infer_sheet_id(sheet_path: Path) -> int:
+    """Infer sheet ID from filename like 'sheet1.tex' or 'Sheet_2.tex'."""
+    match = re.search(r"(\d+)", sheet_path.stem)
+    return int(match.group(1)) if match else 1
+
+
+def _resolve_work_dir(output_dir: Path, course_id: str, sheet_id: int) -> Path:
+    return ensure_solutions_dir(output_dir, course_id, sheet_id)
+
+
+def _load_parsed_problems(work_dir: Path) -> list[dict[str, Any]]:
+    """Load previously parsed problems from the work directory."""
+    f = work_dir / "parsed_problems.json"
+    if not f.exists():
+        raise click.ClickException(
+            f"No parsed problems found at {f}\n"
+            "Run 'mathpipe parse' first."
+        )
+    with open(f, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _load_routing(work_dir: Path) -> dict[str, list[dict[str, Any]]]:
+    """Load routing results."""
+    f = work_dir / "routing.json"
+    if not f.exists():
+        raise click.ClickException(
+            f"No routing data found at {f}\n"
+            "Run 'mathpipe route' first."
+        )
+    with open(f, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _parse_problem_ids(problems_str: str | None) -> list[int] | None:
+    """Parse comma-separated problem IDs like '1,3,5'."""
+    if not problems_str:
+        return None
+    return [int(x.strip()) for x in problems_str.split(",")]
+
+
+def _get_sheet_chapters(config: CourseConfig, sheet_id: int) -> list[int] | None:
+    """Get chapter IDs for a specific sheet from config."""
+    if config.get("sheets"):
+        for s in config["sheets"]:
+            if s["id"] == sheet_id:
+                return s.get("chapters")
+    return None
+
+
+def _run_async(coro):
+    """Run an async coroutine from sync click commands."""
+    try:
+        return asyncio.run(coro)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted.[/] Partial output may be available.")
+        sys.exit(130)
+
+
+# ── Pipeline core functions ───────────────────────────────────────
+
+
+async def _run_kb_extraction(
     chapter_text: str,
     chapter_config: dict[str, Any],
     course_config: CourseConfig,
@@ -63,7 +160,6 @@ async def run_kb_extraction(
 
     kb_dir = ensure_kb_dir(output_dir, course_id, chapter_id)
 
-    # Write chapter source for the agent to read
     source_file = kb_dir / "chapter_source.tex"
     source_file.write_text(chapter_text, encoding="utf-8")
 
@@ -73,7 +169,6 @@ async def run_kb_extraction(
     output_file = kb_dir / "kb.jsonl"
     system_prompt = load_prompt("kb_builder_prompt")
 
-    # Build notation context
     notation_overrides = course_config.get("notation_overrides", {})
     notation_section = ""
     if notation_overrides:
@@ -105,11 +200,13 @@ Instructions:
 
 Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOOD intuition — this is the most valuable output."""
 
-    print(f"\n{'='*60}")
-    print(f"  Chapter {chapter_id}: {chapter_title}")
-    print(f"  Source: {len(chapter_text):,} characters")
-    print(f"  Output: {output_file}")
-    print(f"{'='*60}\n")
+    console.print(Panel(
+        f"[bold]Chapter {chapter_id}:[/] {chapter_title}\n"
+        f"Source: {len(chapter_text):,} characters\n"
+        f"Output: {output_file}",
+        title="KB Extraction",
+        border_style="blue",
+    ))
 
     result = await run_agent(
         system_prompt=system_prompt,
@@ -119,7 +216,6 @@ Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOO
         max_turns=60,
     )
 
-    # Validate output
     stats: dict[str, Any] = {
         "chapter_id": chapter_id,
         "title": chapter_title,
@@ -151,75 +247,7 @@ Be thorough. Extract EVERY formal mathematical statement. Spend time writing GOO
     return stats
 
 
-async def cmd_kb(args: argparse.Namespace) -> int:
-    """Build knowledge base from LaTeX source."""
-    config = load_course_config(args.config)
-    course_id = config["course_id"]
-    model = MODELS[args.model]
-
-    preamble = extract_preamble(args.source)
-    if preamble:
-        print(f"Extracted LaTeX preamble ({len(preamble)} chars)")
-
-    chapters = split_into_chapters(args.source, config)
-    if not chapters:
-        print("Error: No chapters found. Check config titles match LaTeX headings.")
-        return 1
-
-    if args.chapters:
-        chapter_ids = [int(x.strip()) for x in args.chapters.split(",")]
-        chapters = {k: v for k, v in chapters.items() if k in chapter_ids}
-        if not chapters:
-            print(f"Error: No matching chapters for IDs {chapter_ids}")
-            return 1
-
-    print(f"\nMathPipe KB Builder — {config['course_name']}")
-    print(f"Model: {args.model} | Chapters: {sorted(chapters.keys())}")
-    print(f"Output: {args.output_dir / course_id}\n")
-
-    all_stats: list[dict[str, Any]] = []
-    pipeline_start = time.time()
-    chapter_configs = {ch["id"]: ch for ch in config["chapters"]}
-
-    for chapter_id in sorted(chapters.keys()):
-        stats = await run_kb_extraction(
-            chapter_text=chapters[chapter_id],
-            chapter_config=chapter_configs[chapter_id],
-            course_config=config,
-            output_dir=args.output_dir,
-            model=model,
-            preamble=preamble,
-        )
-        all_stats.append(stats)
-
-    total_time = round(time.time() - pipeline_start, 1)
-    total_records = sum(s.get("total_records", 0) for s in all_stats)
-
-    print(f"\n{'='*60}")
-    print(f"  KB BUILD COMPLETE — {total_records} records in {total_time}s")
-    for s in all_stats:
-        marker = "OK" if s.get("status") == "success" else s.get("status", "?").upper()
-        print(f"  Ch {s['chapter_id']}: {s.get('total_records', 0)} records [{marker}]")
-    print(f"{'='*60}\n")
-
-    # Write log
-    log_dir = args.output_dir / course_id / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    write_json(log_dir / f"kb_build_{int(time.time())}.json", {
-        "course_id": course_id,
-        "model": args.model,
-        "total_time_seconds": total_time,
-        "total_records": total_records,
-        "chapters": all_stats,
-    })
-
-    return 0
-
-
-# ── SHEET PROCESSING PIPELINE ──────────────────────────────────────
-
-
-async def solve_problem(
+async def _solve_problem(
     problem: dict[str, Any],
     context_entries: list[dict[str, Any]],
     course_config: CourseConfig,
@@ -231,7 +259,6 @@ async def solve_problem(
     system_prompt = load_prompt("solver_prompt")
     course_id = course_config["course_id"]
 
-    # Write problem and context for the agent
     problem_file = work_dir / f"problem_{problem_num}.json"
     context_file = work_dir / f"context_{problem_num}.txt"
     output_file = work_dir / f"solution_{problem_num}.json"
@@ -248,7 +275,7 @@ async def solve_problem(
 Read both files, then produce a complete solution following the schema in your system prompt.
 The output must be valid JSON (single object, not JSONL). No markdown fences in the file."""
 
-    print(f"\n  Problem {problem_num}: solving...")
+    console.print(f"  [cyan]Problem {problem_num}:[/] solving...")
     result = await run_agent(
         system_prompt=system_prompt,
         task_message=task_message,
@@ -278,7 +305,7 @@ The output must be valid JSON (single object, not JSONL). No markdown fences in 
     return stats
 
 
-async def verify_problem(
+async def _verify_problem(
     problem_num: int,
     work_dir: Path,
     course_config: CourseConfig,
@@ -289,7 +316,6 @@ async def verify_problem(
     output_file = work_dir / f"verification_{problem_num}.json"
 
     solution_file = work_dir / f"solution_{problem_num}.json"
-    context_file = work_dir / f"context_{problem_num}.txt"
 
     if not solution_file.exists():
         return {"problem_id": problem_num, "status": "no_solution"}
@@ -302,7 +328,7 @@ async def verify_problem(
 Read both files, then perform all verification layers as specified in your system prompt.
 The output must be valid JSON. No markdown fences."""
 
-    print(f"  Problem {problem_num}: verifying...")
+    console.print(f"  [cyan]Problem {problem_num}:[/] verifying...")
     result = await run_agent(
         system_prompt=system_prompt,
         task_message=task_message,
@@ -332,139 +358,19 @@ The output must be valid JSON. No markdown fences."""
     return stats
 
 
-async def cmd_sheet(args: argparse.Namespace) -> int:
-    """Process a problem sheet: parse → route → solve → verify → output."""
-    config = load_course_config(args.config)
-    course_id = config["course_id"]
-    model = MODELS[args.model]
-
-    # Parse problem sheet
-    print(f"\nParsing problem sheet: {args.sheet}")
-    problems = parse_sheet(args.sheet)
-    if not problems:
-        print("Error: No problems found in sheet.")
-        return 1
-    print(f"Found {len(problems)} problems")
-    for p in problems:
-        print(f"  {format_problem_for_display(p)}")
-
-    # Determine sheet ID from filename or flag
-    sheet_id = args.sheet_id or _infer_sheet_id(args.sheet)
-    print(f"Sheet ID: {sheet_id}")
-
-    # Load KB
-    all_chapter_ids = [ch["id"] for ch in config["chapters"]]
-    kb = load_full_kb(args.kb_dir, course_id, all_chapter_ids)
-    total_kb = sum(len(v) for v in kb.values())
-    print(f"Loaded KB: {total_kb} entries across {len(kb)} chapters")
-
-    if total_kb == 0:
-        print("Error: KB is empty. Run `mathpipe.py kb` first to build it.")
-        return 1
-
-    # Determine relevant chapters for this sheet
-    sheet_chapters = None
-    if config.get("sheets"):
-        for s in config["sheets"]:
-            if s["id"] == sheet_id:
-                sheet_chapters = s.get("chapters")
-                break
-    if sheet_chapters:
-        print(f"Sheet covers chapters: {sheet_chapters}")
-
-    # Route problems to KB entries
-    print("\nRouting problems to KB entries...")
-    context_bundles = route_sheet(problems, kb, sheet_chapters=sheet_chapters)
-    for pid, entries in context_bundles.items():
-        print(f"  Problem {pid}: {len(entries)} relevant KB entries")
-
-    # Create work directory
-    work_dir = ensure_solutions_dir(args.output_dir, course_id, sheet_id)
-    print(f"Work directory: {work_dir}")
-
-    # Solve each problem
-    print(f"\n{'='*60}")
-    print(f"  SOLVING — Sheet {sheet_id} ({len(problems)} problems)")
-    print(f"  Model: {args.model}")
-    print(f"{'='*60}")
-
-    solve_stats: list[dict[str, Any]] = []
-    for problem in problems:
-        pid = problem["id"]
-        stats = await solve_problem(
-            problem=problem,
-            context_entries=context_bundles.get(pid, []),
-            course_config=config,
-            work_dir=work_dir,
-            model=model,
-            problem_num=pid,
-        )
-        solve_stats.append(stats)
-
-    # Verify each solved problem
-    if not args.skip_verify:
-        print(f"\n{'='*60}")
-        print(f"  VERIFYING")
-        print(f"{'='*60}")
-
-        verify_stats: list[dict[str, Any]] = []
-        for problem in problems:
-            pid = problem["id"]
-            stats = await verify_problem(
-                problem_num=pid,
-                work_dir=work_dir,
-                course_config=config,
-                model=model,
-            )
-            verify_stats.append(stats)
-    else:
-        verify_stats = []
-        print("\n  Verification skipped (--skip-verify)")
-
-    # Generate output based on mode
-    print(f"\n{'='*60}")
-    print(f"  GENERATING OUTPUT — mode: {args.mode}")
-    print(f"{'='*60}")
-
-    await _generate_sheet_output(
-        problems=problems,
-        work_dir=work_dir,
-        course_config=config,
-        model=model,
-        mode=args.mode,
-        sheet_id=sheet_id,
-    )
-
-    # Print summary
-    print(f"\n{'='*60}")
-    print(f"  SHEET PROCESSING COMPLETE")
-    print(f"{'='*60}")
-    for ss in solve_stats:
-        v = next((v for v in verify_stats if v["problem_id"] == ss["problem_id"]), {})
-        vstat = v.get("verification_status", "skipped")
-        print(f"  Problem {ss['problem_id']}: solve={ss['status']}, verify={vstat}")
-    print(f"  Output: {work_dir}")
-    print(f"{'='*60}\n")
-
-    return 0
-
-
-async def _generate_sheet_output(
-    problems: list[dict[str, Any]],
+async def _generate_output(
     work_dir: Path,
     course_config: CourseConfig,
     model: str,
     mode: str,
     sheet_id: int,
-) -> None:
+) -> Path | None:
     """Generate the final output document for a processed sheet."""
-    # For solution_guide mode, use the dedicated prompt; otherwise the general output prompt
     if mode == "solution_guide":
         system_prompt = load_prompt("solution_guide_prompt")
     else:
         system_prompt = load_prompt("output_prompt")
 
-    # Collect all solution and verification files
     solution_files = sorted(work_dir.glob("solution_*.json"))
     verification_files = sorted(work_dir.glob("verification_*.json"))
 
@@ -482,7 +388,6 @@ async def _generate_sheet_output(
 Read all solution files (and verification files if present), then generate the output in {mode} mode as specified in your system prompt.
 Write the result to `{output_file.name}`. No wrapping markdown fences — write the raw format."""
 
-    # Solution guide mode is more intensive — needs more turns for the detailed narrative
     turns = 60 if mode == "solution_guide" else 40
 
     await run_agent(
@@ -494,48 +399,794 @@ Write the result to `{output_file.name}`. No wrapping markdown fences — write 
     )
 
     if output_file.exists():
-        size = output_file.stat().st_size
-        print(f"  Output written: {output_file} ({size:,} bytes)")
-    else:
-        print(f"  Warning: Output file not created: {output_file}")
+        return output_file
+    return None
 
 
-def _infer_sheet_id(sheet_path: Path) -> int:
-    """Try to infer sheet ID from filename like 'sheet1.tex' or 'Sheet_2.tex'."""
-    import re
-    match = re.search(r"(\d+)", sheet_path.stem)
-    return int(match.group(1)) if match else 1
+# ── Click CLI ─────────────────────────────────────────────────────
+
+MODEL_NAMES = list(MODELS.keys())
 
 
-# ── EXPORT PIPELINE ────────────────────────────────────────────────
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx):
+    """MathPipe — Autonomous Mathematics Learning Pipeline.
+
+    Human-in-the-loop workflow: run each step individually and inspect
+    intermediate outputs, or run the full pipeline end-to-end.
+
+    \b
+    Step-by-step:           Full pipeline:
+      mathpipe parse          mathpipe sheet
+      mathpipe route          mathpipe kb
+      mathpipe solve          mathpipe export
+      mathpipe verify
+      mathpipe generate
+      mathpipe status
+    """
+    if ctx.invoked_subcommand is None:
+        _banner()
+        console.print(ctx.get_help())
 
 
-async def cmd_export(args: argparse.Namespace) -> int:
-    """Generate study materials from the KB."""
-    config = load_course_config(args.config)
+# ── parse ─────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet", "sheet_path", type=click.Path(exists=True, path_type=Path), required=True, help="Problem sheet .tex file.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted).")
+def parse(config_path: Path, sheet_path: Path, output_dir: Path, sheet_id: int | None):
+    """Parse a problem sheet into individual problems.
+
+    Extracts problems from LaTeX source and writes parsed_problems.json.
+    No LLM calls — pure parsing. Inspect the output before proceeding.
+    """
+    _banner()
+    config = load_course_config(config_path)
     course_id = config["course_id"]
-    model = MODELS[args.model]
+    sid = sheet_id or _infer_sheet_id(sheet_path)
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_path.name} (ID {sid})",
+        title="[bold]Parse[/]",
+        border_style="cyan",
+    ))
+
+    problems = parse_sheet(sheet_path)
+    if not problems:
+        raise click.ClickException("No problems found in sheet.")
+
+    # Display results table
+    table = Table(title=f"Parsed Problems ({len(problems)})", border_style="cyan")
+    table.add_column("#", style="bold", width=4)
+    table.add_column("Preview", ratio=1)
+    table.add_column("Parts", width=10)
+
+    for p in problems:
+        preview = p["statement"][:80].replace("\n", " ")
+        if len(p["statement"]) > 80:
+            preview += "..."
+        parts_str = ", ".join(pt["label"] for pt in p.get("parts", [])) or "-"
+        table.add_row(str(p["id"]), preview, parts_str)
+
+    console.print(table)
+
+    # Write output
+    work_dir = _resolve_work_dir(output_dir, course_id, sid)
+    out_file = work_dir / "parsed_problems.json"
+    write_json(out_file, problems)
+
+    # Update manifest
+    init_state(
+        work_dir, sid,
+        sheet_file=str(sheet_path),
+        config_file=str(config_path),
+        course_id=course_id,
+    )
+    mark_step(work_dir, "parse", "done", problems_count=len(problems))
+
+    console.print(f"\n[green]Done.[/] Wrote [bold]{out_file}[/] ({len(problems)} problems)")
+    console.print("[dim]Inspect the file, then run:[/] [bold cyan]mathpipe route[/]")
+
+
+# ── route ─────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
+@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
+    """Route parsed problems to relevant KB entries.
+
+    Matches each problem to knowledge base entries using keyword analysis.
+    No LLM calls — pure keyword scoring. Inspect routing.json before solving.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+
+    problems = _load_parsed_problems(work_dir)
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_id} ({len(problems)} problems)",
+        title="[bold]Route[/]",
+        border_style="cyan",
+    ))
 
     # Load KB
     all_chapter_ids = [ch["id"] for ch in config["chapters"]]
-    if args.chapters:
-        all_chapter_ids = [int(x.strip()) for x in args.chapters.split(",")]
-
-    kb = load_full_kb(args.kb_dir, course_id, all_chapter_ids)
+    kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
     total_kb = sum(len(v) for v in kb.values())
-    print(f"\nLoaded KB: {total_kb} entries across {len(kb)} chapters")
 
     if total_kb == 0:
-        print("Error: KB is empty. Run `mathpipe.py kb` first.")
-        return 1
+        raise click.ClickException(
+            "KB is empty. Run 'mathpipe kb' first to build it."
+        )
 
-    export_dir = ensure_exports_dir(args.output_dir, course_id)
+    console.print(f"  Loaded KB: [bold]{total_kb}[/] entries across {len(kb)} chapters")
+
+    sheet_chapters = _get_sheet_chapters(config, sheet_id)
+    if sheet_chapters:
+        console.print(f"  Sheet covers chapters: {sheet_chapters}")
+
+    # Route
+    context_bundles = route_sheet(problems, kb, sheet_chapters=sheet_chapters)
+
+    # Display results
+    table = Table(title="Routing Results", border_style="cyan")
+    table.add_column("Problem", style="bold", width=8)
+    table.add_column("KB Entries", width=10)
+    table.add_column("Top Match", ratio=1)
+
+    total_entries = 0
+    for p in problems:
+        pid = p["id"]
+        entries = context_bundles.get(pid, [])
+        total_entries += len(entries)
+        top = entries[0].get("name", "?") if entries else "-"
+        table.add_row(str(pid), str(len(entries)), top)
+
+    console.print(table)
+
+    # Write outputs
+    # Save the full routing as JSON (keyed by string IDs for JSON compat)
+    routing_file = work_dir / "routing.json"
+    routing_data = {str(pid): entries for pid, entries in context_bundles.items()}
+    write_json(routing_file, routing_data)
+
+    # Also write individual context files for the solver
+    for p in problems:
+        pid = p["id"]
+        entries = context_bundles.get(pid, [])
+        ctx_file = work_dir / f"context_{pid}.txt"
+        ctx_file.write_text(format_context_bundle(entries), encoding="utf-8")
+
+    mark_step(work_dir, "route", "done", total_entries=total_entries)
+
+    console.print(f"\n[green]Done.[/] Wrote [bold]{routing_file}[/] ({total_entries} total entries)")
+    console.print("[dim]Inspect routing.json and context_N.txt, then run:[/] [bold cyan]mathpipe solve[/]")
+
+
+# ── solve ─────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+@click.option("--problems", type=str, default=None, help="Comma-separated problem IDs to solve (default: all).")
+def solve(config_path: Path, sheet_id: int, output_dir: Path, model: str, problems: str | None):
+    """Solve problems using the LLM.
+
+    Requires parse and route to have been run first.
+    Use --problems to solve specific problems (e.g. --problems 1,3,5).
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+
+    all_problems = _load_parsed_problems(work_dir)
+    routing = _load_routing(work_dir)
+
+    target_ids = _parse_problem_ids(problems)
+    if target_ids:
+        to_solve = [p for p in all_problems if p["id"] in target_ids]
+    else:
+        to_solve = all_problems
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_id}\n"
+        f"[bold]Model:[/]  {model}\n"
+        f"[bold]Problems:[/] {', '.join(str(p['id']) for p in to_solve)}",
+        title="[bold]Solve[/]",
+        border_style="yellow",
+    ))
+
+    model_id = MODELS[model]
+    solve_stats: list[dict[str, Any]] = []
+
+    async def _do_solve():
+        for p in to_solve:
+            pid = p["id"]
+            context_entries = routing.get(str(pid), [])
+            stats = await _solve_problem(
+                problem=p,
+                context_entries=context_entries,
+                course_config=config,
+                work_dir=work_dir,
+                model=model_id,
+                problem_num=pid,
+            )
+            solve_stats.append(stats)
+
+    _run_async(_do_solve())
+
+    # Display results
+    table = Table(title="Solve Results", border_style="yellow")
+    table.add_column("Problem", style="bold", width=8)
+    table.add_column("Status", width=14)
+    table.add_column("Strategies", width=10)
+    table.add_column("Confidence", width=10)
+    table.add_column("Time", width=8)
+
+    for s in solve_stats:
+        status_style = "green" if s["status"] == "success" else "red"
+        table.add_row(
+            str(s["problem_id"]),
+            f"[{status_style}]{s['status']}[/]",
+            str(s.get("strategies", "-")),
+            f"{s.get('confidence', '-')}",
+            f"{s.get('duration_seconds', '-')}s",
+        )
+
+    console.print(table)
+
+    # Update manifest
+    done_ids = [s["problem_id"] for s in solve_stats if s["status"] == "success"]
+    all_ids = [p["id"] for p in all_problems]
+    # Check for previously solved problems
+    state = load_state(work_dir)
+    prev_done = state.get("steps", {}).get("solve", {}).get("done", [])
+    all_done = sorted(set(prev_done) | set(done_ids))
+    pending = sorted(set(all_ids) - set(all_done))
+
+    status = "done" if not pending else "partial"
+    mark_step(work_dir, "solve", status, done=all_done, pending=pending)
+
+    console.print(f"\n[green]Done.[/] Solutions written to [bold]{work_dir}[/]")
+    console.print("[dim]Inspect solution_N.json files, then run:[/] [bold cyan]mathpipe verify[/]")
+
+
+# ── verify ────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+@click.option("--problems", type=str, default=None, help="Comma-separated problem IDs to verify (default: all solved).")
+def verify(config_path: Path, sheet_id: int, output_dir: Path, model: str, problems: str | None):
+    """Verify solutions using adversarial LLM checking.
+
+    Requires solve to have been run first. Each solution gets a
+    4-layer verification: structural, adversarial, consistency, confidence.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+
+    all_problems = _load_parsed_problems(work_dir)
+
+    # Find which problems have solutions
+    solved_ids = []
+    for p in all_problems:
+        if (work_dir / f"solution_{p['id']}.json").exists():
+            solved_ids.append(p["id"])
+
+    if not solved_ids:
+        raise click.ClickException("No solutions found. Run 'mathpipe solve' first.")
+
+    target_ids = _parse_problem_ids(problems) or solved_ids
+    target_ids = [pid for pid in target_ids if pid in solved_ids]
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_id}\n"
+        f"[bold]Model:[/]  {model}\n"
+        f"[bold]Verifying:[/] problems {', '.join(str(x) for x in target_ids)}",
+        title="[bold]Verify[/]",
+        border_style="magenta",
+    ))
+
+    model_id = MODELS[model]
+    verify_stats: list[dict[str, Any]] = []
+
+    async def _do_verify():
+        for pid in target_ids:
+            stats = await _verify_problem(
+                problem_num=pid,
+                work_dir=work_dir,
+                course_config=config,
+                model=model_id,
+            )
+            verify_stats.append(stats)
+
+    _run_async(_do_verify())
+
+    # Display results
+    table = Table(title="Verification Results", border_style="magenta")
+    table.add_column("Problem", style="bold", width=8)
+    table.add_column("Status", width=14)
+    table.add_column("Verdict", width=12)
+    table.add_column("Confidence", width=10)
+    table.add_column("Review?", width=8)
+
+    for s in verify_stats:
+        status_style = "green" if s["status"] == "success" else "red"
+        verdict = s.get("verification_status", "-")
+        verdict_style = {"verified": "green", "flagged": "yellow", "rejected": "red"}.get(verdict, "white")
+        review = "yes" if s.get("human_review_required") else "no"
+        table.add_row(
+            str(s["problem_id"]),
+            f"[{status_style}]{s['status']}[/]",
+            f"[{verdict_style}]{verdict}[/]",
+            f"{s.get('confidence', '-')}",
+            review,
+        )
+
+    console.print(table)
+
+    # Update manifest
+    done_ids = [s["problem_id"] for s in verify_stats if s["status"] == "success"]
+    state = load_state(work_dir)
+    prev_done = state.get("steps", {}).get("verify", {}).get("done", [])
+    all_done = sorted(set(prev_done) | set(done_ids))
+    pending = sorted(set(solved_ids) - set(all_done))
+
+    status = "done" if not pending else "partial"
+    mark_step(work_dir, "verify", status, done=all_done, pending=pending)
+
+    console.print(f"\n[green]Done.[/] Verifications written to [bold]{work_dir}[/]")
+    console.print("[dim]Inspect verification_N.json files, then run:[/] [bold cyan]mathpipe generate[/]")
+
+
+# ── generate ──────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+@click.option("--mode", type=click.Choice(["hints", "study", "solution_guide", "anki", "tricks"]), default="hints", help="Output mode.")
+def generate(config_path: Path, sheet_id: int, output_dir: Path, model: str, mode: str):
+    """Generate final output from solutions.
+
+    Transforms solved (and optionally verified) problems into the chosen
+    output format: hints, study notes, solution guide, Anki cards, or tricks.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+
+    # Check that solutions exist
+    solution_files = sorted(work_dir.glob("solution_*.json"))
+    if not solution_files:
+        raise click.ClickException("No solutions found. Run 'mathpipe solve' first.")
+
+    verification_files = sorted(work_dir.glob("verification_*.json"))
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_id}\n"
+        f"[bold]Mode:[/]   {mode}\n"
+        f"[bold]Model:[/]  {model}\n"
+        f"Solutions: {len(solution_files)} | Verifications: {len(verification_files)}",
+        title="[bold]Generate[/]",
+        border_style="green",
+    ))
+
+    model_id = MODELS[model]
+
+    async def _do_generate():
+        return await _generate_output(
+            work_dir=work_dir,
+            course_config=config,
+            model=model_id,
+            mode=mode,
+            sheet_id=sheet_id,
+        )
+
+    output_file = _run_async(_do_generate())
+
+    if output_file:
+        size = output_file.stat().st_size
+        mark_step(work_dir, "generate", "done", mode=mode, output_file=str(output_file), size_bytes=size)
+        console.print(f"\n[green]Done.[/] Wrote [bold]{output_file}[/] ({size:,} bytes)")
+    else:
+        console.print("[red]Warning:[/] Output file was not created.")
+
+
+# ── status ────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+def status(config_path: Path, sheet_id: int, output_dir: Path):
+    """Show pipeline status for a problem sheet.
+
+    Displays which steps have been completed, their timestamps,
+    and key statistics.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+
+    state = load_state(work_dir)
+    steps = state.get("steps", {})
+
+    console.print(Panel(
+        f"[bold]Course:[/]  {config['course_name']}\n"
+        f"[bold]Sheet:[/]   {sheet_id}\n"
+        f"[bold]WorkDir:[/] {work_dir}",
+        title="[bold]Pipeline Status[/]",
+        border_style="blue",
+    ))
+
+    # Status icons
+    ICONS = {"done": "[green]\u2713[/]", "partial": "[yellow]\u25d0[/]", "pending": "[dim]\u25cb[/]", "error": "[red]\u2717[/]"}
+
+    table = Table(border_style="blue", show_header=True)
+    table.add_column("Step", style="bold", width=10)
+    table.add_column("Status", width=10)
+    table.add_column("Details", ratio=1)
+    table.add_column("Timestamp", width=22)
+
+    for step_name in STEPS:
+        step = steps.get(step_name, {"status": "pending"})
+        st = step.get("status", "pending")
+        icon = ICONS.get(st, "[dim]?[/]")
+        ts = step.get("timestamp", "")
+
+        # Build details string
+        details_parts = []
+        if step.get("problems_count"):
+            details_parts.append(f"{step['problems_count']} problems")
+        if step.get("total_entries"):
+            details_parts.append(f"{step['total_entries']} KB entries")
+        if step.get("done"):
+            details_parts.append(f"done: {step['done']}")
+        if step.get("pending"):
+            details_parts.append(f"pending: {step['pending']}")
+        if step.get("mode"):
+            details_parts.append(f"mode: {step['mode']}")
+        if step.get("size_bytes"):
+            details_parts.append(f"{step['size_bytes']:,} bytes")
+        details = ", ".join(details_parts) or "-"
+
+        table.add_row(step_name, f"{icon} {st}", details, ts)
+
+    console.print(table)
+
+    # Show files in work directory
+    if work_dir.exists():
+        files = sorted(work_dir.iterdir())
+        if files:
+            file_table = Table(title="Work Directory Files", border_style="dim")
+            file_table.add_column("File", ratio=1)
+            file_table.add_column("Size", width=12)
+            for f in files:
+                if f.is_file():
+                    file_table.add_row(f.name, f"{f.stat().st_size:,} bytes")
+            console.print(file_table)
+
+
+# ── sheet (full pipeline) ────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--sheet", "sheet_path", type=click.Path(exists=True, path_type=Path), required=True, help="Problem sheet .tex file.")
+@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted).")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+@click.option("--mode", type=click.Choice(["hints", "study", "solution_guide", "anki", "tricks"]), default="hints", help="Output mode.")
+@click.option("--skip-verify", is_flag=True, help="Skip verification step.")
+def sheet(config_path: Path, sheet_path: Path, kb_dir: Path, output_dir: Path,
+          sheet_id: int | None, model: str, mode: str, skip_verify: bool):
+    """Run the full pipeline: parse -> route -> solve -> verify -> generate.
+
+    Convenience command that runs all steps end-to-end without pausing
+    for human inspection. Use the individual step commands for more control.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    model_id = MODELS[model]
+    sid = sheet_id or _infer_sheet_id(sheet_path)
+
+    console.print(Panel(
+        f"[bold]Course:[/] {config['course_name']}\n"
+        f"[bold]Sheet:[/]  {sheet_path.name} (ID {sid})\n"
+        f"[bold]Model:[/]  {model}\n"
+        f"[bold]Mode:[/]   {mode}",
+        title="[bold]Full Pipeline[/]",
+        border_style="blue",
+    ))
+
+    async def _do_full_pipeline():
+        # Step 1: Parse
+        console.rule("[cyan]Step 1/5 — Parse[/]")
+        problems = parse_sheet(sheet_path)
+        if not problems:
+            raise click.ClickException("No problems found in sheet.")
+        console.print(f"  Found [bold]{len(problems)}[/] problems")
+        for p in problems:
+            console.print(f"  {format_problem_for_display(p)}")
+
+        work_dir = _resolve_work_dir(output_dir, course_id, sid)
+        write_json(work_dir / "parsed_problems.json", problems)
+        init_state(work_dir, sid, str(sheet_path), str(config_path), course_id)
+        mark_step(work_dir, "parse", "done", problems_count=len(problems))
+
+        # Step 2: Route
+        console.rule("[cyan]Step 2/5 — Route[/]")
+        all_chapter_ids = [ch["id"] for ch in config["chapters"]]
+        kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
+        total_kb = sum(len(v) for v in kb.values())
+        console.print(f"  Loaded KB: [bold]{total_kb}[/] entries")
+
+        if total_kb == 0:
+            raise click.ClickException("KB is empty. Run 'mathpipe kb' first.")
+
+        sheet_chapters = _get_sheet_chapters(config, sid)
+        context_bundles = route_sheet(problems, kb, sheet_chapters=sheet_chapters)
+
+        routing_data = {str(pid): entries for pid, entries in context_bundles.items()}
+        write_json(work_dir / "routing.json", routing_data)
+        for p in problems:
+            pid = p["id"]
+            entries = context_bundles.get(pid, [])
+            ctx_file = work_dir / f"context_{pid}.txt"
+            ctx_file.write_text(format_context_bundle(entries), encoding="utf-8")
+            console.print(f"  Problem {pid}: {len(entries)} KB entries")
+        mark_step(work_dir, "route", "done", total_entries=sum(len(v) for v in context_bundles.values()))
+
+        # Step 3: Solve
+        console.rule("[yellow]Step 3/5 — Solve[/]")
+        solve_stats = []
+        for p in problems:
+            pid = p["id"]
+            stats = await _solve_problem(
+                problem=p,
+                context_entries=context_bundles.get(pid, []),
+                course_config=config,
+                work_dir=work_dir,
+                model=model_id,
+                problem_num=pid,
+            )
+            solve_stats.append(stats)
+        done_ids = [s["problem_id"] for s in solve_stats if s["status"] == "success"]
+        mark_step(work_dir, "solve", "done", done=done_ids, pending=[])
+
+        # Step 4: Verify
+        verify_stats = []
+        if not skip_verify:
+            console.rule("[magenta]Step 4/5 — Verify[/]")
+            for p in problems:
+                pid = p["id"]
+                stats = await _verify_problem(
+                    problem_num=pid,
+                    work_dir=work_dir,
+                    course_config=config,
+                    model=model_id,
+                )
+                verify_stats.append(stats)
+            vdone = [s["problem_id"] for s in verify_stats if s["status"] == "success"]
+            mark_step(work_dir, "verify", "done", done=vdone, pending=[])
+        else:
+            console.print("\n  [dim]Verification skipped (--skip-verify)[/]")
+            mark_step(work_dir, "verify", "done", skipped=True)
+
+        # Step 5: Generate
+        console.rule("[green]Step 5/5 — Generate[/]")
+        output_file = await _generate_output(
+            work_dir=work_dir,
+            course_config=config,
+            model=model_id,
+            mode=mode,
+            sheet_id=sid,
+        )
+
+        if output_file:
+            size = output_file.stat().st_size
+            mark_step(work_dir, "generate", "done", mode=mode, output_file=str(output_file), size_bytes=size)
+
+        # Summary
+        console.rule("[bold]Summary[/]")
+        summary_table = Table(border_style="green")
+        summary_table.add_column("Problem", style="bold", width=8)
+        summary_table.add_column("Solve", width=14)
+        summary_table.add_column("Verify", width=14)
+
+        for ss in solve_stats:
+            v = next((v for v in verify_stats if v["problem_id"] == ss["problem_id"]), {})
+            vstat = v.get("verification_status", "skipped")
+            s_style = "green" if ss["status"] == "success" else "red"
+            v_style = {"verified": "green", "flagged": "yellow", "rejected": "red", "skipped": "dim"}.get(vstat, "white")
+            summary_table.add_row(
+                str(ss["problem_id"]),
+                f"[{s_style}]{ss['status']}[/]",
+                f"[{v_style}]{vstat}[/]",
+            )
+
+        console.print(summary_table)
+        if output_file:
+            console.print(f"\n[green]Output:[/] [bold]{output_file}[/]")
+        console.print(f"[green]Work dir:[/] [bold]{work_dir}[/]")
+
+    _run_async(_do_full_pipeline())
+
+
+# ── kb ────────────────────────────────────────────────────────────
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--source", "source_path", type=click.Path(exists=True, path_type=Path), required=True, help="LaTeX source file.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB output directory.")
+@click.option("--chapters", type=str, default=None, help="Comma-separated chapter IDs.")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | None, model: str):
+    """Build knowledge base from LaTeX lecture notes.
+
+    Extracts definitions, theorems, lemmas, and other mathematical objects
+    from LaTeX source, building a structured JSONL knowledge base.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    model_id = MODELS[model]
+
+    preamble = extract_preamble(source_path)
+    if preamble:
+        console.print(f"  Extracted LaTeX preamble ({len(preamble)} chars)")
+
+    chapter_map = split_into_chapters(source_path, config)
+    if not chapter_map:
+        raise click.ClickException("No chapters found. Check config titles match LaTeX headings.")
+
+    if chapters:
+        chapter_ids = [int(x.strip()) for x in chapters.split(",")]
+        chapter_map = {k: v for k, v in chapter_map.items() if k in chapter_ids}
+        if not chapter_map:
+            raise click.ClickException(f"No matching chapters for IDs {chapter_ids}")
+
+    console.print(Panel(
+        f"[bold]Course:[/]   {config['course_name']}\n"
+        f"[bold]Model:[/]    {model}\n"
+        f"[bold]Chapters:[/] {sorted(chapter_map.keys())}\n"
+        f"[bold]Output:[/]   {output_dir / course_id}",
+        title="[bold]KB Build[/]",
+        border_style="blue",
+    ))
+
+    chapter_configs = {ch["id"]: ch for ch in config["chapters"]}
+
+    async def _do_kb():
+        all_stats = []
+        pipeline_start = time.time()
+
+        for chapter_id in sorted(chapter_map.keys()):
+            stats = await _run_kb_extraction(
+                chapter_text=chapter_map[chapter_id],
+                chapter_config=chapter_configs[chapter_id],
+                course_config=config,
+                output_dir=output_dir,
+                model=model_id,
+                preamble=preamble,
+            )
+            all_stats.append(stats)
+
+        total_time = round(time.time() - pipeline_start, 1)
+        total_records = sum(s.get("total_records", 0) for s in all_stats)
+
+        # Summary table
+        table = Table(title=f"KB Build Complete \u2014 {total_records} records in {total_time}s", border_style="green")
+        table.add_column("Chapter", style="bold", width=8)
+        table.add_column("Title", ratio=1)
+        table.add_column("Records", width=8)
+        table.add_column("Status", width=10)
+
+        for s in all_stats:
+            st = s.get("status", "?")
+            st_style = "green" if st == "success" else "red"
+            table.add_row(
+                str(s["chapter_id"]),
+                s["title"],
+                str(s.get("total_records", 0)),
+                f"[{st_style}]{st}[/]",
+            )
+
+        console.print(table)
+
+        # Write log
+        log_dir = output_dir / course_id / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        write_json(log_dir / f"kb_build_{int(time.time())}.json", {
+            "course_id": course_id,
+            "model": model,
+            "total_time_seconds": total_time,
+            "total_records": total_records,
+            "chapters": all_stats,
+        })
+
+    _run_async(_do_kb())
+
+
+# ── export ────────────────────────────────────────────────────────
+
+
+@cli.command("export")
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
+@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
+@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="Export output directory.")
+@click.option("--chapters", type=str, default=None, help="Comma-separated chapter IDs.")
+@click.option("--format", "fmt", type=click.Choice(["study", "anki", "tricks"]), required=True, help="Export format.")
+@click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
+def export_cmd(config_path: Path, kb_dir: Path, output_dir: Path, chapters: str | None, fmt: str, model: str):
+    """Generate study materials from the knowledge base.
+
+    Export the KB as study notes, Anki flashcards, or a trick bank.
+    """
+    _banner()
+    config = load_course_config(config_path)
+    course_id = config["course_id"]
+    model_id = MODELS[model]
+
+    all_chapter_ids = [ch["id"] for ch in config["chapters"]]
+    if chapters:
+        all_chapter_ids = [int(x.strip()) for x in chapters.split(",")]
+
+    kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
+    total_kb = sum(len(v) for v in kb.values())
+
+    if total_kb == 0:
+        raise click.ClickException("KB is empty. Run 'mathpipe kb' first.")
+
+    console.print(Panel(
+        f"[bold]Course:[/]  {config['course_name']}\n"
+        f"[bold]Format:[/]  {fmt}\n"
+        f"[bold]KB:[/]      {total_kb} entries across {len(kb)} chapters\n"
+        f"[bold]Model:[/]   {model}",
+        title="[bold]Export[/]",
+        border_style="green",
+    ))
+
+    export_dir = ensure_exports_dir(output_dir, course_id)
     system_prompt = load_prompt("output_prompt")
 
     output_ext = {"study": "md", "anki": "csv", "tricks": "jsonl"}
-    output_file = export_dir / f"{args.format}.{output_ext.get(args.format, 'md')}"
+    output_file = export_dir / f"{fmt}.{output_ext.get(fmt, 'md')}"
 
-    # Write all KB entries to a single file for the agent to read
     all_entries_file = export_dir / "kb_all.jsonl"
     with open(all_entries_file, "w", encoding="utf-8") as f:
         for ch_id in sorted(kb.keys()):
@@ -548,128 +1199,52 @@ async def cmd_export(args: argparse.Namespace) -> int:
         if ch["id"] in all_chapter_ids
     )
 
-    task_message = f"""Generate {args.format} mode output from the knowledge base.
+    task_message = f"""Generate {fmt} mode output from the knowledge base.
 
 **Course:** {config["course_name"]} ({course_id})
-**Mode:** {args.format}
+**Mode:** {fmt}
 **KB file:** kb_all.jsonl ({total_kb} entries)
 **Chapters:** {chapters_info}
 **Output file:** {output_file.name}
 
-Read `kb_all.jsonl` (one JSON object per line), then generate the {args.format} output as specified in your system prompt.
+Read `kb_all.jsonl` (one JSON object per line), then generate the {fmt} output as specified in your system prompt.
 Write the result to `{output_file.name}`. No wrapping markdown fences."""
 
-    print(f"\nGenerating {args.format} export...")
-    print(f"Model: {args.model} | Output: {output_file}")
+    async def _do_export():
+        await run_agent(
+            system_prompt=system_prompt,
+            task_message=task_message,
+            cwd=export_dir,
+            model=model_id,
+            max_turns=50,
+        )
 
-    await run_agent(
-        system_prompt=system_prompt,
-        task_message=task_message,
-        cwd=export_dir,
-        model=model,
-        max_turns=50,
-    )
+    _run_async(_do_export())
 
     if output_file.exists():
         size = output_file.stat().st_size
-        print(f"\nExport written: {output_file} ({size:,} bytes)")
+        console.print(f"\n[green]Done.[/] Wrote [bold]{output_file}[/] ({size:,} bytes)")
     else:
-        print(f"\nWarning: Export not created: {output_file}")
-
-    return 0
+        console.print("[red]Warning:[/] Export file was not created.")
 
 
-# ── CLI ─────────────────────────────────────────────────────────────
+# ── Entry point ───────────────────────────────────────────────────
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser with subcommands."""
-    parser = argparse.ArgumentParser(
-        prog="mathpipe",
-        description="MathPipe — Autonomous Mathematics Learning Pipeline",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Commands:
-  kb      Build knowledge base from LaTeX source
-  sheet   Process a problem sheet (route, solve, verify, output)
-  export  Generate study materials from the KB (study notes, Anki, tricks)
-
-Examples:
-  python mathpipe.py kb --config config/course.yaml --source notes.tex
-  python mathpipe.py sheet --config config/course.yaml --sheet sheet1.tex
-  python mathpipe.py export --config config/course.yaml --format anki
-        """,
-    )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # ── kb ──
-    kb_p = subparsers.add_parser("kb", help="Build knowledge base from LaTeX source")
-    kb_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
-    kb_p.add_argument("--source", type=Path, required=True, help="LaTeX source file")
-    kb_p.add_argument("--output-dir", type=Path, default=Path("./kb"), help="KB output dir")
-    kb_p.add_argument("--chapters", type=str, default=None, help="Comma-separated chapter IDs")
-    kb_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
-
-    # ── sheet ──
-    sheet_p = subparsers.add_parser("sheet", help="Process a problem sheet")
-    sheet_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
-    sheet_p.add_argument("--sheet", type=Path, required=True, help="Problem sheet .tex file")
-    sheet_p.add_argument("--kb-dir", type=Path, default=Path("./kb"), help="KB directory")
-    sheet_p.add_argument("--output-dir", type=Path, default=Path("./solutions"), help="Solutions output dir")
-    sheet_p.add_argument("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted)")
-    sheet_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
-    sheet_p.add_argument("--mode", choices=["hints", "study", "solution_guide", "full"], default="hints",
-                         help="Output mode: hints (progressive disclosure), study (full notes), solution_guide (deep intuition), full (everything)")
-    sheet_p.add_argument("--skip-verify", action="store_true", help="Skip verification step")
-
-    # ── export ──
-    export_p = subparsers.add_parser("export", help="Generate study materials from KB")
-    export_p.add_argument("--config", type=Path, required=True, help="Course config YAML")
-    export_p.add_argument("--kb-dir", type=Path, default=Path("./kb"), help="KB directory")
-    export_p.add_argument("--output-dir", type=Path, default=Path("./kb"), help="Export output dir")
-    export_p.add_argument("--chapters", type=str, default=None, help="Comma-separated chapter IDs")
-    export_p.add_argument("--format", choices=["study", "anki", "tricks"], required=True,
-                          help="Export format")
-    export_p.add_argument("--model", choices=list(MODELS.keys()), default="sonnet")
-
-    return parser
-
-
-def main() -> int:
-    """Main entry point."""
-    parser = build_parser()
-    args = parser.parse_args()
-
-    # Validate common inputs
-    if not args.config.exists():
-        print(f"Error: Config not found: {args.config}")
-        return 1
-
-    if args.command == "kb" and not args.source.exists():
-        print(f"Error: Source not found: {args.source}")
-        return 1
-
-    if args.command == "sheet" and not args.sheet.exists():
-        print(f"Error: Sheet not found: {args.sheet}")
-        return 1
-
-    # Dispatch to command handler
-    handlers = {
-        "kb": cmd_kb,
-        "sheet": cmd_sheet,
-        "export": cmd_export,
-    }
-
+def main():
     try:
-        return asyncio.run(handlers[args.command](args))
-    except KeyboardInterrupt:
-        print("\n\nInterrupted. Partial output may be available.")
-        return 130
+        cli(standalone_mode=False)
+    except click.ClickException as e:
+        console.print(f"[red]Error:[/] {e.format_message()}")
+        sys.exit(1)
+    except click.Abort:
+        console.print("\n[yellow]Aborted.[/]")
+        sys.exit(130)
     except Exception as e:
-        print(f"\nFatal error: {type(e).__name__}: {e}")
+        console.print(f"\n[red]Fatal error:[/] {type(e).__name__}: {e}")
         traceback.print_exc()
-        return 1
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
