@@ -46,9 +46,12 @@ MATH_KEYWORDS: dict[str, list[str]] = {
 }
 
 
-def load_chapter_kb(kb_dir: Path, course_id: str, chapter_id: int) -> list[dict[str, Any]]:
-    """Load all KB records for a specific chapter."""
-    chapter_dir = kb_dir / course_id / f"chapter_{chapter_id}"
+def load_chapter_kb(base_dir: Path, chapter_id: int) -> list[dict[str, Any]]:
+    """Load all KB records for a specific chapter.
+
+    Looks in {base_dir}/kb/chapter_{chapter_id}/*.jsonl
+    """
+    chapter_dir = base_dir / "kb" / f"chapter_{chapter_id}"
     if not chapter_dir.exists():
         return []
 
@@ -58,11 +61,11 @@ def load_chapter_kb(kb_dir: Path, course_id: str, chapter_id: int) -> list[dict[
     return records
 
 
-def load_full_kb(kb_dir: Path, course_id: str, chapter_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+def load_full_kb(base_dir: Path, chapter_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
     """Load KB records for multiple chapters, keyed by chapter_id."""
     kb: dict[int, list[dict[str, Any]]] = {}
     for ch_id in chapter_ids:
-        records = load_chapter_kb(kb_dir, course_id, ch_id)
+        records = load_chapter_kb(base_dir, ch_id)
         if records:
             kb[ch_id] = records
     return kb

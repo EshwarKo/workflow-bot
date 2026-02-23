@@ -9,16 +9,24 @@ confidence-graded study materials with genuine mathematical intuition.
 Human-in-the-loop workflow — run each step individually and inspect
 intermediate outputs, or run the full pipeline end-to-end.
 
+Course layout (under courses/<course>/):
+    course.yaml          config file
+    notes/               lecture notes (.tex)
+    sheets/              problem sheets (.tex)
+    kb/                  generated knowledge base
+    solutions/           generated solutions
+    exports/             exported study materials
+
 Usage:
-    python mathpipe.py parse    --config config/course.yaml --sheet sheet1.tex
-    python mathpipe.py route    --config config/course.yaml --sheet-id 1
-    python mathpipe.py solve    --config config/course.yaml --sheet-id 1
-    python mathpipe.py verify   --config config/course.yaml --sheet-id 1
-    python mathpipe.py generate --config config/course.yaml --sheet-id 1 --mode hints
-    python mathpipe.py status   --config config/course.yaml --sheet-id 1
-    python mathpipe.py sheet    --config config/course.yaml --sheet sheet1.tex
-    python mathpipe.py kb       --config config/course.yaml --source notes.tex
-    python mathpipe.py export   --config config/course.yaml --format study
+    python mathpipe.py parse    --config courses/func/course.yaml --sheet sheets/sheet1.tex
+    python mathpipe.py route    --config courses/func/course.yaml --sheet-id 1
+    python mathpipe.py solve    --config courses/func/course.yaml --sheet-id 1
+    python mathpipe.py verify   --config courses/func/course.yaml --sheet-id 1
+    python mathpipe.py generate --config courses/func/course.yaml --sheet-id 1 --mode hints
+    python mathpipe.py status   --config courses/func/course.yaml --sheet-id 1
+    python mathpipe.py sheet    --config courses/func/course.yaml --sheet sheets/sheet1.tex
+    python mathpipe.py kb       --config courses/func/course.yaml --source notes/notes.tex
+    python mathpipe.py export   --config courses/func/course.yaml --format study
 """
 
 import asyncio
@@ -38,7 +46,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agent_session import MODELS, load_prompt, run_agent
-from config_loader import load_course_config, CourseConfig
+from config_loader import load_course_config, resolve_path, CourseConfig
 from kb_writer import (
     ensure_kb_dir,
     ensure_solutions_dir,
@@ -89,8 +97,8 @@ def _infer_sheet_id(sheet_path: Path) -> int:
     return int(match.group(1)) if match else 1
 
 
-def _resolve_work_dir(output_dir: Path, course_id: str, sheet_id: int) -> Path:
-    return ensure_solutions_dir(output_dir, course_id, sheet_id)
+def _resolve_work_dir(base_dir: Path, sheet_id: int) -> Path:
+    return ensure_solutions_dir(base_dir, sheet_id)
 
 
 def _load_parsed_problems(work_dir: Path) -> list[dict[str, Any]]:
@@ -133,6 +141,19 @@ def _get_sheet_chapters(config: CourseConfig, sheet_id: int) -> list[int] | None
     return None
 
 
+def _resolve_sheet_path(config: CourseConfig, sheet_arg: Path) -> Path:
+    """Resolve a sheet path: if relative, resolve against config base_dir."""
+    if sheet_arg.is_absolute():
+        return sheet_arg
+    resolved = resolve_path(config, str(sheet_arg))
+    if resolved.exists():
+        return resolved
+    # Fall back to CWD-relative (backwards compat)
+    if sheet_arg.exists():
+        return sheet_arg.resolve()
+    return resolved
+
+
 def _run_async(coro):
     """Run an async coroutine from sync click commands."""
     try:
@@ -149,16 +170,16 @@ async def _run_kb_extraction(
     chapter_text: str,
     chapter_config: dict[str, Any],
     course_config: CourseConfig,
-    output_dir: Path,
     model: str,
     preamble: str = "",
 ) -> dict[str, Any]:
     """Run KB extraction for a single chapter."""
     course_id = course_config["course_id"]
+    base_dir = course_config["base_dir"]
     chapter_id = chapter_config["id"]
     chapter_title = chapter_config["title"]
 
-    kb_dir = ensure_kb_dir(output_dir, course_id, chapter_id)
+    kb_dir = ensure_kb_dir(base_dir, chapter_id)
 
     source_file = kb_dir / "chapter_source.tex"
     source_file.write_text(chapter_text, encoding="utf-8")
@@ -416,6 +437,14 @@ def cli(ctx):
     Run without a command to launch interactive mode with arrow-key navigation.
 
     \b
+    Course layout:
+      courses/<name>/course.yaml     config
+      courses/<name>/notes/           lecture notes
+      courses/<name>/sheets/          problem sheets
+      courses/<name>/kb/              generated KB
+      courses/<name>/solutions/       generated solutions
+
+    \b
     Interactive:              Step-by-step:           Full pipeline:
       mathpipe                  mathpipe parse          mathpipe sheet
       mathpipe interactive      mathpipe route          mathpipe kb
@@ -447,10 +476,9 @@ def interactive():
 
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
-@click.option("--sheet", "sheet_path", type=click.Path(exists=True, path_type=Path), required=True, help="Problem sheet .tex file.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--sheet", "sheet_path", type=click.Path(path_type=Path), required=True, help="Problem sheet .tex file (relative to course dir or absolute).")
 @click.option("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted).")
-def parse(config_path: Path, sheet_path: Path, output_dir: Path, sheet_id: int | None):
+def parse(config_path: Path, sheet_path: Path, sheet_id: int | None):
     """Parse a problem sheet into individual problems.
 
     Extracts problems from LaTeX source and writes parsed_problems.json.
@@ -458,7 +486,9 @@ def parse(config_path: Path, sheet_path: Path, output_dir: Path, sheet_id: int |
     """
     _banner()
     config = load_course_config(config_path)
+    base_dir = config["base_dir"]
     course_id = config["course_id"]
+    sheet_path = _resolve_sheet_path(config, sheet_path)
     sid = sheet_id or _infer_sheet_id(sheet_path)
 
     console.print(Panel(
@@ -488,7 +518,7 @@ def parse(config_path: Path, sheet_path: Path, output_dir: Path, sheet_id: int |
     console.print(table)
 
     # Write output
-    work_dir = _resolve_work_dir(output_dir, course_id, sid)
+    work_dir = _resolve_work_dir(base_dir, sid)
     out_file = work_dir / "parsed_problems.json"
     write_json(out_file, problems)
 
@@ -511,9 +541,7 @@ def parse(config_path: Path, sheet_path: Path, output_dir: Path, sheet_id: int |
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
 @click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
-@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
-def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
+def route(config_path: Path, sheet_id: int):
     """Route parsed problems to relevant KB entries.
 
     Matches each problem to knowledge base entries using keyword analysis.
@@ -521,8 +549,8 @@ def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
-    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+    base_dir = config["base_dir"]
+    work_dir = _resolve_work_dir(base_dir, sheet_id)
 
     problems = _load_parsed_problems(work_dir)
 
@@ -535,7 +563,7 @@ def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
 
     # Load KB
     all_chapter_ids = [ch["id"] for ch in config["chapters"]]
-    kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
+    kb = load_full_kb(base_dir, all_chapter_ids)
     total_kb = sum(len(v) for v in kb.values())
 
     if total_kb == 0:
@@ -569,12 +597,10 @@ def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
     console.print(table)
 
     # Write outputs
-    # Save the full routing as JSON (keyed by string IDs for JSON compat)
     routing_file = work_dir / "routing.json"
     routing_data = {str(pid): entries for pid, entries in context_bundles.items()}
     write_json(routing_file, routing_data)
 
-    # Also write individual context files for the solver
     for p in problems:
         pid = p["id"]
         entries = context_bundles.get(pid, [])
@@ -593,10 +619,9 @@ def route(config_path: Path, sheet_id: int, kb_dir: Path, output_dir: Path):
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
 @click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
 @click.option("--problems", type=str, default=None, help="Comma-separated problem IDs to solve (default: all).")
-def solve(config_path: Path, sheet_id: int, output_dir: Path, model: str, problems: str | None):
+def solve(config_path: Path, sheet_id: int, model: str, problems: str | None):
     """Solve problems using the LLM.
 
     Requires parse and route to have been run first.
@@ -604,8 +629,8 @@ def solve(config_path: Path, sheet_id: int, output_dir: Path, model: str, proble
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
-    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+    base_dir = config["base_dir"]
+    work_dir = _resolve_work_dir(base_dir, sheet_id)
 
     all_problems = _load_parsed_problems(work_dir)
     routing = _load_routing(work_dir)
@@ -667,7 +692,6 @@ def solve(config_path: Path, sheet_id: int, output_dir: Path, model: str, proble
     # Update manifest
     done_ids = [s["problem_id"] for s in solve_stats if s["status"] == "success"]
     all_ids = [p["id"] for p in all_problems]
-    # Check for previously solved problems
     state = load_state(work_dir)
     prev_done = state.get("steps", {}).get("solve", {}).get("done", [])
     all_done = sorted(set(prev_done) | set(done_ids))
@@ -686,10 +710,9 @@ def solve(config_path: Path, sheet_id: int, output_dir: Path, model: str, proble
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
 @click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
 @click.option("--problems", type=str, default=None, help="Comma-separated problem IDs to verify (default: all solved).")
-def verify(config_path: Path, sheet_id: int, output_dir: Path, model: str, problems: str | None):
+def verify(config_path: Path, sheet_id: int, model: str, problems: str | None):
     """Verify solutions using adversarial LLM checking.
 
     Requires solve to have been run first. Each solution gets a
@@ -697,8 +720,8 @@ def verify(config_path: Path, sheet_id: int, output_dir: Path, model: str, probl
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
-    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+    base_dir = config["base_dir"]
+    work_dir = _resolve_work_dir(base_dir, sheet_id)
 
     all_problems = _load_parsed_problems(work_dir)
 
@@ -781,10 +804,9 @@ def verify(config_path: Path, sheet_id: int, output_dir: Path, model: str, probl
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
 @click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
 @click.option("--mode", type=click.Choice(["hints", "study", "solution_guide", "anki", "tricks"]), default="hints", help="Output mode.")
-def generate(config_path: Path, sheet_id: int, output_dir: Path, model: str, mode: str):
+def generate(config_path: Path, sheet_id: int, model: str, mode: str):
     """Generate final output from solutions.
 
     Transforms solved (and optionally verified) problems into the chosen
@@ -792,8 +814,8 @@ def generate(config_path: Path, sheet_id: int, output_dir: Path, model: str, mod
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
-    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+    base_dir = config["base_dir"]
+    work_dir = _resolve_work_dir(base_dir, sheet_id)
 
     # Check that solutions exist
     solution_files = sorted(work_dir.glob("solution_*.json"))
@@ -839,8 +861,7 @@ def generate(config_path: Path, sheet_id: int, output_dir: Path, model: str, mod
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
 @click.option("--sheet-id", type=int, required=True, help="Sheet ID.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
-def status(config_path: Path, sheet_id: int, output_dir: Path):
+def status(config_path: Path, sheet_id: int):
     """Show pipeline status for a problem sheet.
 
     Displays which steps have been completed, their timestamps,
@@ -848,8 +869,8 @@ def status(config_path: Path, sheet_id: int, output_dir: Path):
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
-    work_dir = _resolve_work_dir(output_dir, course_id, sheet_id)
+    base_dir = config["base_dir"]
+    work_dir = _resolve_work_dir(base_dir, sheet_id)
 
     state = load_state(work_dir)
     steps = state.get("steps", {})
@@ -915,15 +936,12 @@ def status(config_path: Path, sheet_id: int, output_dir: Path):
 
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
-@click.option("--sheet", "sheet_path", type=click.Path(exists=True, path_type=Path), required=True, help="Problem sheet .tex file.")
-@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./solutions"), help="Solutions output directory.")
+@click.option("--sheet", "sheet_path", type=click.Path(path_type=Path), required=True, help="Problem sheet .tex file (relative to course dir or absolute).")
 @click.option("--sheet-id", type=int, default=None, help="Sheet ID (inferred from filename if omitted).")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
 @click.option("--mode", type=click.Choice(["hints", "study", "solution_guide", "anki", "tricks"]), default="hints", help="Output mode.")
 @click.option("--skip-verify", is_flag=True, help="Skip verification step.")
-def sheet(config_path: Path, sheet_path: Path, kb_dir: Path, output_dir: Path,
-          sheet_id: int | None, model: str, mode: str, skip_verify: bool):
+def sheet(config_path: Path, sheet_path: Path, sheet_id: int | None, model: str, mode: str, skip_verify: bool):
     """Run the full pipeline: parse -> route -> solve -> verify -> generate.
 
     Convenience command that runs all steps end-to-end without pausing
@@ -931,8 +949,9 @@ def sheet(config_path: Path, sheet_path: Path, kb_dir: Path, output_dir: Path,
     """
     _banner()
     config = load_course_config(config_path)
-    course_id = config["course_id"]
+    base_dir = config["base_dir"]
     model_id = MODELS[model]
+    sheet_path = _resolve_sheet_path(config, sheet_path)
     sid = sheet_id or _infer_sheet_id(sheet_path)
 
     console.print(Panel(
@@ -954,15 +973,15 @@ def sheet(config_path: Path, sheet_path: Path, kb_dir: Path, output_dir: Path,
         for p in problems:
             console.print(f"  {format_problem_for_display(p)}")
 
-        work_dir = _resolve_work_dir(output_dir, course_id, sid)
+        work_dir = _resolve_work_dir(base_dir, sid)
         write_json(work_dir / "parsed_problems.json", problems)
-        init_state(work_dir, sid, str(sheet_path), str(config_path), course_id)
+        init_state(work_dir, sid, str(sheet_path), str(config_path), config["course_id"])
         mark_step(work_dir, "parse", "done", problems_count=len(problems))
 
         # Step 2: Route
         console.rule("[cyan]Step 2/5 — Route[/]")
         all_chapter_ids = [ch["id"] for ch in config["chapters"]]
-        kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
+        kb = load_full_kb(base_dir, all_chapter_ids)
         total_kb = sum(len(v) for v in kb.values())
         console.print(f"  Loaded KB: [bold]{total_kb}[/] entries")
 
@@ -1063,20 +1082,33 @@ def sheet(config_path: Path, sheet_path: Path, kb_dir: Path, output_dir: Path,
 
 @cli.command()
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
-@click.option("--source", "source_path", type=click.Path(exists=True, path_type=Path), required=True, help="LaTeX source file.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB output directory.")
+@click.option("--source", "source_path", type=click.Path(path_type=Path), default=None, help="LaTeX source file (default: source_tex from config).")
 @click.option("--chapters", type=str, default=None, help="Comma-separated chapter IDs.")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
-def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | None, model: str):
+def kb(config_path: Path, source_path: Path | None, chapters: str | None, model: str):
     """Build knowledge base from LaTeX lecture notes.
 
     Extracts definitions, theorems, lemmas, and other mathematical objects
     from LaTeX source, building a structured JSONL knowledge base.
+
+    If --source is omitted, uses source_tex from the config file.
     """
     _banner()
     config = load_course_config(config_path)
+    base_dir = config["base_dir"]
     course_id = config["course_id"]
     model_id = MODELS[model]
+
+    # Resolve source path
+    if source_path is None:
+        if "source_tex" not in config:
+            raise click.ClickException("No --source given and no source_tex in config.")
+        source_path = resolve_path(config, config["source_tex"])
+    else:
+        source_path = _resolve_sheet_path(config, source_path)
+
+    if not source_path.exists():
+        raise click.ClickException(f"Source file not found: {source_path}")
 
     preamble = extract_preamble(source_path)
     if preamble:
@@ -1096,7 +1128,7 @@ def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | N
         f"[bold]Course:[/]   {config['course_name']}\n"
         f"[bold]Model:[/]    {model}\n"
         f"[bold]Chapters:[/] {sorted(chapter_map.keys())}\n"
-        f"[bold]Output:[/]   {output_dir / course_id}",
+        f"[bold]Output:[/]   {base_dir / 'kb'}",
         title="[bold]KB Build[/]",
         border_style="blue",
     ))
@@ -1112,7 +1144,6 @@ def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | N
                 chapter_text=chapter_map[chapter_id],
                 chapter_config=chapter_configs[chapter_id],
                 course_config=config,
-                output_dir=output_dir,
                 model=model_id,
                 preamble=preamble,
             )
@@ -1141,7 +1172,7 @@ def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | N
         console.print(table)
 
         # Write log
-        log_dir = output_dir / course_id / "logs"
+        log_dir = base_dir / "kb" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         write_json(log_dir / f"kb_build_{int(time.time())}.json", {
             "course_id": course_id,
@@ -1159,18 +1190,17 @@ def kb(config_path: Path, source_path: Path, output_dir: Path, chapters: str | N
 
 @cli.command("export")
 @click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), required=True, help="Course config YAML.")
-@click.option("--kb-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="KB directory.")
-@click.option("--output-dir", type=click.Path(path_type=Path), default=Path("./kb"), help="Export output directory.")
 @click.option("--chapters", type=str, default=None, help="Comma-separated chapter IDs.")
 @click.option("--format", "fmt", type=click.Choice(["study", "anki", "tricks"]), required=True, help="Export format.")
 @click.option("--model", type=click.Choice(MODEL_NAMES), default="sonnet", help="Model to use.")
-def export_cmd(config_path: Path, kb_dir: Path, output_dir: Path, chapters: str | None, fmt: str, model: str):
+def export_cmd(config_path: Path, chapters: str | None, fmt: str, model: str):
     """Generate study materials from the knowledge base.
 
     Export the KB as study notes, Anki flashcards, or a trick bank.
     """
     _banner()
     config = load_course_config(config_path)
+    base_dir = config["base_dir"]
     course_id = config["course_id"]
     model_id = MODELS[model]
 
@@ -1178,7 +1208,7 @@ def export_cmd(config_path: Path, kb_dir: Path, output_dir: Path, chapters: str 
     if chapters:
         all_chapter_ids = [int(x.strip()) for x in chapters.split(",")]
 
-    kb = load_full_kb(kb_dir, course_id, all_chapter_ids)
+    kb = load_full_kb(base_dir, all_chapter_ids)
     total_kb = sum(len(v) for v in kb.values())
 
     if total_kb == 0:
@@ -1193,7 +1223,7 @@ def export_cmd(config_path: Path, kb_dir: Path, output_dir: Path, chapters: str 
         border_style="green",
     ))
 
-    export_dir = ensure_exports_dir(output_dir, course_id)
+    export_dir = ensure_exports_dir(base_dir)
     system_prompt = load_prompt("output_prompt")
 
     output_ext = {"study": "md", "anki": "csv", "tricks": "jsonl"}

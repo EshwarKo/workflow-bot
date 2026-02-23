@@ -3,6 +3,11 @@ Knowledge Base Writer
 =====================
 
 Utilities for reading, writing, and validating JSONL knowledge base files.
+
+Directory layout (all under course base_dir):
+    kb/chapter_{N}/kb.jsonl
+    solutions/sheet_{N}/pipeline_state.json
+    exports/study.md
 """
 
 import json
@@ -10,21 +15,13 @@ from pathlib import Path
 from typing import Any
 
 
-def ensure_kb_dir(output_dir: Path, course_id: str, chapter_id: int) -> Path:
+def ensure_kb_dir(base_dir: Path, chapter_id: int) -> Path:
     """
     Create and return the KB directory for a chapter.
 
-    Structure: {output_dir}/{course_id}/chapter_{chapter_id}/
-
-    Args:
-        output_dir: Base output directory.
-        course_id: Course identifier.
-        chapter_id: Chapter number.
-
-    Returns:
-        Path to the chapter's KB directory.
+    Structure: {base_dir}/kb/chapter_{chapter_id}/
     """
-    kb_dir = output_dir / course_id / f"chapter_{chapter_id}"
+    kb_dir = base_dir / "kb" / f"chapter_{chapter_id}"
     kb_dir.mkdir(parents=True, exist_ok=True)
     return kb_dir
 
@@ -193,16 +190,22 @@ def summarise_kb(kb_dir: Path) -> dict[str, Any]:
 # --- Solution and export directory helpers ---
 
 
-def ensure_solutions_dir(output_dir: Path, course_id: str, sheet_id: int) -> Path:
-    """Create and return the solutions directory for a problem sheet."""
-    sol_dir = output_dir / course_id / f"sheet_{sheet_id}"
+def ensure_solutions_dir(base_dir: Path, sheet_id: int) -> Path:
+    """Create and return the solutions directory for a problem sheet.
+
+    Structure: {base_dir}/solutions/sheet_{sheet_id}/
+    """
+    sol_dir = base_dir / "solutions" / f"sheet_{sheet_id}"
     sol_dir.mkdir(parents=True, exist_ok=True)
     return sol_dir
 
 
-def ensure_exports_dir(output_dir: Path, course_id: str) -> Path:
-    """Create and return the exports directory for a course."""
-    exp_dir = output_dir / course_id / "exports"
+def ensure_exports_dir(base_dir: Path) -> Path:
+    """Create and return the exports directory for a course.
+
+    Structure: {base_dir}/exports/
+    """
+    exp_dir = base_dir / "exports"
     exp_dir.mkdir(parents=True, exist_ok=True)
     return exp_dir
 

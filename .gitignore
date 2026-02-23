@@ -1,7 +1,12 @@
 # Agent-generated output directories
 generations/
 
-# MathPipe output
+# MathPipe generated output (inside course dirs)
+courses/*/kb/
+courses/*/solutions/
+courses/*/exports/
+
+# Legacy output dirs (pre-refactor)
 kb/
 solutions/
 

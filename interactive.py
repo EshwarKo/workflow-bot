@@ -5,6 +5,14 @@ MathPipe Interactive Mode
 Persistent interactive CLI with arrow-key navigation, session state,
 and guided workflow. Stays in the MathPipe shell between steps so you
 can inspect outputs and pick your next action.
+
+Course layout:
+    courses/<name>/course.yaml     config
+    courses/<name>/notes/           lecture notes
+    courses/<name>/sheets/          problem sheets
+    courses/<name>/kb/              generated KB (output)
+    courses/<name>/solutions/       generated solutions (output)
+    courses/<name>/exports/         exported study materials (output)
 """
 
 import asyncio
@@ -47,30 +55,66 @@ class Session:
         self.config_path: Path | None = None
         self.config: dict[str, Any] | None = None
         self.course_id: str | None = None
+        self.base_dir: Path | None = None  # Course root (config's parent dir)
         self.sheet_path: Path | None = None
         self.sheet_id: int | None = None
-        self.output_dir: Path = Path("./solutions")
-        self.kb_dir: Path = Path("./kb")
         self.model: str = "sonnet"
 
     @property
     def work_dir(self) -> Path | None:
-        if self.course_id and self.sheet_id is not None:
-            return self.output_dir / self.course_id / f"sheet_{self.sheet_id}"
+        if self.base_dir and self.sheet_id is not None:
+            return self.base_dir / "solutions" / f"sheet_{self.sheet_id}"
         return None
 
 
 # ── Helpers ───────────────────────────────────────────────────────
 
 
-def _find_files(pattern: str, dirs: list[str] | None = None) -> list[str]:
-    """Find files matching a glob pattern in common directories."""
+def _find_configs() -> list[str]:
+    """Find course config files in courses/ and common locations."""
     results: list[str] = []
-    search_dirs = dirs or [".", "config", "sample_data", "data", "sheets", "notes"]
-    for d in search_dirs:
-        p = Path(d)
+    search = [
+        ("courses", "**/course.yaml"),
+        ("courses", "**/course.yml"),
+        ("courses", "**/*.yaml"),
+        ("config", "*.yaml"),
+        ("config", "*.yml"),
+        (".", "course.yaml"),
+    ]
+    for base, pattern in search:
+        p = Path(base)
         if p.exists():
             results.extend(str(f) for f in p.glob(pattern))
+    return sorted(set(results))
+
+
+def _find_sheets(session: Session) -> list[str]:
+    """Find .tex sheet files, prioritising the current course's sheets/ dir."""
+    results: list[str] = []
+    # Prefer sheets from current course
+    if session.base_dir:
+        sheets_dir = session.base_dir / "sheets"
+        if sheets_dir.exists():
+            results.extend(str(f) for f in sheets_dir.glob("*.tex"))
+    # Also search common locations
+    for d in ["courses", "sample_data", "sheets", "."]:
+        p = Path(d)
+        if p.exists():
+            results.extend(str(f) for f in p.rglob("*.tex") if "notes" not in str(f) and "chapter" not in f.stem.lower())
+    return sorted(set(results))
+
+
+def _find_notes(session: Session) -> list[str]:
+    """Find .tex note files, prioritising the current course's notes/ dir."""
+    results: list[str] = []
+    if session.base_dir:
+        notes_dir = session.base_dir / "notes"
+        if notes_dir.exists():
+            results.extend(str(f) for f in notes_dir.glob("*.tex"))
+    for d in ["courses", "sample_data", "notes", "."]:
+        p = Path(d)
+        if p.exists():
+            results.extend(str(f) for f in p.rglob("*.tex"))
     return sorted(set(results))
 
 
@@ -84,7 +128,7 @@ def _ask_config(session: Session) -> bool:
         if reuse:
             return True
 
-    yaml_files = _find_files("*.yaml") + _find_files("*.yml")
+    yaml_files = _find_configs()
     if yaml_files:
         choices = yaml_files + [Separator(), "Enter path manually..."]
         picked = inquirer.select(
@@ -110,7 +154,9 @@ def _ask_config(session: Session) -> bool:
         session.config_path = Path(picked)
         session.config = load_course_config(session.config_path)
         session.course_id = session.config["course_id"]
+        session.base_dir = session.config["base_dir"]
         console.print(f"  [green]Loaded:[/] {session.config['course_name']} ({session.course_id})")
+        console.print(f"  [dim]Course dir: {session.base_dir}[/]")
         return True
     except Exception as e:
         console.print(f"  [red]Error loading config:[/] {e}")
@@ -129,7 +175,7 @@ def _ask_sheet(session: Session) -> bool:
         if reuse:
             return True
 
-    tex_files = _find_files("*.tex")
+    tex_files = _find_sheets(session)
     if tex_files:
         choices = tex_files + [Separator(), "Enter path manually..."]
         picked = inquirer.select(
@@ -150,7 +196,7 @@ def _ask_sheet(session: Session) -> bool:
             only_files=True,
         ).execute()
 
-    session.sheet_path = Path(picked)
+    session.sheet_path = Path(picked).resolve()
 
     import re
     match = re.search(r"(\d+)", session.sheet_path.stem)
@@ -303,7 +349,7 @@ def _action_parse(session: Session) -> None:
     console.print(table)
 
     # Write
-    work_dir = ensure_solutions_dir(session.output_dir, session.course_id, session.sheet_id)
+    work_dir = ensure_solutions_dir(session.base_dir, session.sheet_id)
     out_file = work_dir / "parsed_problems.json"
     write_json(out_file, problems)
 
@@ -335,7 +381,7 @@ def _action_route(session: Session) -> None:
         problems = json.load(f)
 
     all_chapter_ids = [ch["id"] for ch in session.config["chapters"]]
-    kb = load_full_kb(session.kb_dir, session.course_id, all_chapter_ids)
+    kb = load_full_kb(session.base_dir, all_chapter_ids)
     total_kb = sum(len(v) for v in kb.values())
 
     if total_kb == 0:
@@ -606,8 +652,8 @@ def _action_kb(session: Session) -> None:
     if not _ask_config(session):
         return
 
-    # Pick source file
-    tex_files = _find_files("*.tex")
+    # Pick source file — prioritise notes/ from current course
+    tex_files = _find_notes(session)
     if tex_files:
         choices = tex_files + [Separator(), "Enter path manually..."]
         picked = inquirer.select(message="LaTeX source file:", choices=choices, keybindings=VIM_KB).execute()
@@ -662,7 +708,6 @@ def _action_kb(session: Session) -> None:
                 chapter_text=chapter_map[chapter_id],
                 chapter_config=chapter_configs[chapter_id],
                 course_config=session.config,
-                output_dir=session.kb_dir,
                 model=model_id,
                 preamble=preamble,
             )
@@ -688,12 +733,12 @@ def _action_kb(session: Session) -> None:
 
 def _action_settings(session: Session) -> None:
     """Adjust session settings."""
+    base_display = str(session.base_dir) if session.base_dir else "not set"
     setting = inquirer.select(
         message="Setting to change:",
         choices=[
             {"name": f"Model          (current: {session.model})", "value": "model"},
-            {"name": f"Output dir     (current: {session.output_dir})", "value": "output_dir"},
-            {"name": f"KB dir         (current: {session.kb_dir})", "value": "kb_dir"},
+            {"name": f"Course dir     (current: {base_display})", "value": "course_dir"},
             {"name": f"Config         (current: {session.config_path or 'not set'})", "value": "config"},
             {"name": f"Sheet          (current: {session.sheet_path or 'not set'}, ID {session.sheet_id})", "value": "sheet"},
         ],
@@ -702,14 +747,11 @@ def _action_settings(session: Session) -> None:
 
     if setting == "model":
         _ask_model(session)
-    elif setting == "output_dir":
-        session.output_dir = Path(inquirer.text(
-            message="Output directory:", default=str(session.output_dir),
-        ).execute())
-    elif setting == "kb_dir":
-        session.kb_dir = Path(inquirer.text(
-            message="KB directory:", default=str(session.kb_dir),
-        ).execute())
+    elif setting == "course_dir":
+        console.print(f"  [dim]Course dir is derived from config location.[/]")
+        console.print(f"  [dim]Change config to change course dir.[/]")
+        session.config_path = None
+        _ask_config(session)
     elif setting == "config":
         session.config_path = None
         _ask_config(session)
@@ -772,7 +814,7 @@ def run_interactive() -> None:
             Separator("\n  \u2500\u2500 Other \u2500\u2500"),
             {"name": "  Status        Show pipeline progress", "value": "status"},
             {"name": "  Build KB      Extract knowledge base from notes", "value": "kb"},
-            {"name": "  Settings      Change model, paths, config", "value": "settings"},
+            {"name": "  Settings      Change model, config, sheet", "value": "settings"},
             Separator(),
             {"name": "  Exit", "value": "exit"},
         ]

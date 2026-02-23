@@ -1,0 +1,45 @@
+# MathPipe Course Configuration
+# Functional Analysis — Example for MVP testing
+#
+# Directory layout (relative to this file):
+#   notes/       Lecture notes (.tex)
+#   sheets/      Problem sheets (.tex)
+#   kb/          Generated knowledge base (output)
+#   solutions/   Generated solutions (output)
+#   exports/     Exported study materials (output)
+
+course_id: "func_analysis_2026"
+course_name: "Functional Analysis"
+term: "HT2026"
+
+# Source file for KB building (relative to this config file)
+source_tex: "notes/example_chapter.tex"
+
+chapters:
+  - id: 1
+    title: "Normed Spaces and Banach Spaces"
+    prerequisites: []
+
+  - id: 2
+    title: "Bounded Linear Operators"
+    prerequisites: [1]
+
+  - id: 3
+    title: "The Baire Category Theorem and Applications"
+    prerequisites: [1, 2]
+
+# Problem sheets
+sheets:
+  - id: 1
+    filename: "sheets/example_sheet.tex"
+    chapters: [1, 2]
+  - id: 2
+    filename: "sheet2.pdf"
+    chapters: [2, 3]
+
+# Course-specific notation overrides
+notation_overrides:
+  "\\mathcal{B}(X,Y)": "space of bounded linear operators from X to Y"
+  "\\|\\cdot\\|": "norm (context-dependent — may be operator norm or space norm)"
+  "B_X": "closed unit ball of X"
+  "X^*": "continuous dual space of X"

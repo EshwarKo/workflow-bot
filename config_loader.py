@@ -3,6 +3,11 @@ Course Configuration Loader
 ============================
 
 Loads and validates course_config.yaml files for MathPipe.
+
+The config file's parent directory becomes the course ``base_dir``.
+All relative paths in the config (source_tex, sheet filenames) resolve
+from there, and all generated output (kb/, solutions/, exports/) is
+written under the same directory.
 """
 
 import yaml
@@ -38,22 +43,30 @@ class CourseConfig(TypedDict, total=False):
     chapters: list[ChapterConfig]
     sheets: list[SheetConfig]
     notation_overrides: dict[str, str]
+    # Derived at load time — NOT stored in yaml
+    base_dir: Path
 
 
 def load_course_config(config_path: Path) -> CourseConfig:
     """
     Load and validate a course configuration YAML file.
 
+    The config file's parent directory is stored as ``base_dir`` in the
+    returned dict.  All relative paths (source_tex, sheet filenames,
+    output directories) should resolve from ``base_dir``.
+
     Args:
         config_path: Path to the YAML config file.
 
     Returns:
-        Validated CourseConfig dictionary.
+        Validated CourseConfig dictionary with ``base_dir`` set.
 
     Raises:
         FileNotFoundError: If config file doesn't exist.
         ValueError: If required fields are missing or invalid.
     """
+    config_path = config_path.resolve()
+
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
@@ -119,4 +132,18 @@ def load_course_config(config_path: Path) -> CourseConfig:
         if not isinstance(overrides, dict):
             raise ValueError("notation_overrides must be a mapping")
 
+    # Inject base_dir — the config file's parent directory
+    raw["base_dir"] = config_path.parent
+
     return raw  # type: ignore[return-value]
+
+
+def resolve_path(config: CourseConfig, relative: str) -> Path:
+    """Resolve a path relative to the course base_dir.
+
+    If the path is already absolute, return it as-is.
+    """
+    p = Path(relative)
+    if p.is_absolute():
+        return p
+    return config["base_dir"] / p
