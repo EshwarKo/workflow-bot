@@ -9,8 +9,10 @@ solutions/
 logs/
 
 .env
+.venv
 venv
 venv_linux
+.DS_Store
 .env.tmp
 __pycache__
 api-key
